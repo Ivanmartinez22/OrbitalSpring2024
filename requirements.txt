@@ -1,0 +1,8 @@
+numpy==1.26.3
+stable-baselines3==2.2.1
+gymnasium==0.29.1
+gym==0.26.2
+shimmy==1.3.0
+pyorb==0.5.4
+matplotlib==3.8.2
+
