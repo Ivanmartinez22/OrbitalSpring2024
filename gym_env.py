@@ -106,36 +106,42 @@ class OrekitEnv(gym.Env):
         self.id = random.randint(1,100000)
         self.alg = ""
 
-        # state params
-        self.px = []
-        self.py = []
-        self.pz = []
-        self.a_orbit = []
-        self.ex_orbit = []
-        self.ey_orbit = []
-        self.hx_orbit = []
-        self.hy_orbit = []
-        self.lv_orbit = []
+        # satellite position
+        self.px = [] # satellite x position
+        self.py = [] # satellite y position
+        self.pz = [] # satellite z position
 
-        # Kepler
-        self.e_orbit = []
-        self.i_orbit = []
-        self.w_orbit = []
-        self.omega_orbit = []
-        self.v_orbit = []
+        # satellite target position
+        self.target_px = [] # target x
+        self.target_py = [] # target y
+        self.target_pz = [] # target z
 
+        # state params (used in model)
+        self.a_orbit = [] # semimajor axis
+        self.ex_orbit = [] # eccentricity x
+        self.ey_orbit = [] # eccentricity y
+        self.hx_orbit = [] # inclination x
+        self.hy_orbit = [] # inclination y
+        self.lv_orbit = [] # ???
+
+        # rate of change of state params
         self.adot_orbit = []
         self.exdot_orbit = []
         self.eydot_orbit = []
         self.hxdot_orbit = []
         self.hydot_orbit = []
 
+        # Kepler coordinates
+        # https://en.wikipedia.org/wiki/Orbital_elements
+        self.e_orbit = [] # eccentricity
+        self.i_orbit = [] # inclination
+        self.w_orbit = [] # argument of periapsis
+        self.omega_orbit = [] # longitude of ascending node
+        self.v_orbit = [] # true anomaly at epoch
+
         self._sc_fuel = None
         self._extrap_Date = None
         self._targetOrbit = None
-        self.target_px = []
-        self.target_py = []
-        self.target_pz = []
 
         self.total_reward = 0
         self.episode_num = 0
@@ -173,8 +179,8 @@ class OrekitEnv(gym.Env):
 
         self.stepT = stepT
 
-        # self.action_space = 3  # output thrust directions
         # OpenAI API to define 3D continous action space vector [a,b,c]
+        # Force in radial, circumferential, and normal directions
         self.action_space = spaces.Box(
             low=-0.6,
             high=0.6,
@@ -183,6 +189,7 @@ class OrekitEnv(gym.Env):
         )
         # self.observation_space = 10  # states | Equinoctial components + derivatives
         # OpenAI API
+        # state params + derivatives
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf,shape=(10,),
                                         dtype=np.float32)
         self.action_bound = 0.6  # Max thrust limit
@@ -197,6 +204,7 @@ class OrekitEnv(gym.Env):
 
         self.r_target_state = self.get_state(self._targetOrbit)
         self.r_initial_state = self.get_state(self._orbit)
+
 
     def set_date(self, date=None, absolute_date=None, step=0):
         """
@@ -216,6 +224,7 @@ class OrekitEnv(gym.Env):
             now = datetime.datetime.now()
             year, month, day, hour, minute, sec = now.year, now.month, now.day, now.hour, now.minute, float(now.second)
             self._initial_date = AbsoluteDate(year, month, day, hour, minute, sec, UTC)
+
 
     def create_orbit(self, state, date, target=False):
         """
@@ -249,10 +258,11 @@ class OrekitEnv(gym.Env):
             self._currentOrbit = set_orbit
             self._orbit = set_orbit
 
-    def convert_to_keplerian(self, orbit):
 
+    def convert_to_keplerian(self, orbit):
         ko = KeplerianOrbit(orbit)
         return ko
+
 
     def set_spacecraft(self, mass, fuel_mass):
         """
@@ -263,6 +273,7 @@ class OrekitEnv(gym.Env):
         """
         sc_state = SpacecraftState(self._orbit, mass)
         self._sc_fuel = sc_state.addAdditionalState (FUEL_MASS, fuel_mass)
+
 
     def create_Propagator(self):
         """
@@ -304,6 +315,7 @@ class OrekitEnv(gym.Env):
                                 Constants.WGS84_EARTH_FLATTENING,itrf)
         gravityProvider = GravityFieldFactory.getNormalizedProvider(8, 8)
         self._prop.addForceModel(HolmesFeatherstoneAttractionModel(earth.getBodyFrame(), gravityProvider))
+
 
     def reset(self):
         """
@@ -392,6 +404,7 @@ class OrekitEnv(gym.Env):
         """
         return self._sc_fuel.getAdditionalState(FUEL_MASS)[0] + self._sc_fuel.getMass()
 
+
     def get_state(self, orbit, with_derivatives=True):
 
         if with_derivatives:
@@ -405,6 +418,7 @@ class OrekitEnv(gym.Env):
                        orbit.getHx(), orbit.getHy(), orbit.getLv()]
 
         return state
+
 
     def step(self, thrust):
         """
@@ -477,6 +491,7 @@ class OrekitEnv(gym.Env):
         self.hydot_orbit.append(self._currentOrbit.getHyDot())
 
         return np.array(state_1), reward, done, info
+
 
     def dist_reward(self):
         """
