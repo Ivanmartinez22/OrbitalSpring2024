@@ -98,6 +98,7 @@ class OrekitEnv(gym.Env):
         """
 
         """
+        (this was preexisting but did not match any of the actual parameters)
         initializes the orekit VM and included libraries
         Params:
         _prop: The propagation object
@@ -422,6 +423,7 @@ class OrekitEnv(gym.Env):
         return self._sc_fuel.getAdditionalState(FUEL_MASS)[0] + self._sc_fuel.getMass()
 
 
+    # return state as list from orbit object
     def get_state(self, orbit, with_derivatives=True):
 
         if with_derivatives:

@@ -24,10 +24,13 @@
 # *****************************************************************************
 
 import sys
+import torch
 import numpy as np
 from stable_baselines3 import TD3, DDPG
 from stable_baselines3.common.noise import NormalActionNoise
 from gym_env import OrekitEnv
+
+print(torch.cuda.is_available())
 
 def train_model(alg, initial_state, target_state, simulation_date, 
                 simulation_duration, spacecraft_mass, simulation_stepT):
