@@ -88,6 +88,17 @@ class OrekitEnv(gym.Env):
 
     def __init__(self, state, state_targ, date, duration, mass, stepT):
         """
+        Params:
+        state: Kepler coordinates of current state
+        state_targ: Kepler coordinates of target state
+        date: Start date
+        duration: Simulation duration
+        mass: [dry_mass, fuel_mass]
+        stepT: Time between time steps (seconds)
+        """
+
+        """
+        (this was preexisting but did not match any of the actual parameters)
         initializes the orekit VM and included libraries
         Params:
         _prop: The propagation object
@@ -101,41 +112,48 @@ class OrekitEnv(gym.Env):
         _extrap_Date: changing date during propagation state
         _sc_state: The spacecraft without fuel
         """
+
         super(OrekitEnv, self).__init__()
         # ID for reward/state output files (Can create better system)
         self.id = random.randint(1,100000)
         self.alg = ""
 
-        # state params
-        self.px = []
-        self.py = []
-        self.pz = []
-        self.a_orbit = []
-        self.ex_orbit = []
-        self.ey_orbit = []
-        self.hx_orbit = []
-        self.hy_orbit = []
-        self.lv_orbit = []
+        # satellite position
+        self.px = [] # satellite x position
+        self.py = [] # satellite y position
+        self.pz = [] # satellite z position
 
-        # Kepler
-        self.e_orbit = []
-        self.i_orbit = []
-        self.w_orbit = []
-        self.omega_orbit = []
-        self.v_orbit = []
+        # satellite target position
+        self.target_px = [] # target x
+        self.target_py = [] # target y
+        self.target_pz = [] # target z
 
+        # state params (used in model)
+        self.a_orbit = [] # semimajor axis
+        self.ex_orbit = [] # eccentricity x
+        self.ey_orbit = [] # eccentricity y
+        self.hx_orbit = [] # inclination x
+        self.hy_orbit = [] # inclination y
+        self.lv_orbit = [] # ???
+
+        # rate of change of state params
         self.adot_orbit = []
         self.exdot_orbit = []
         self.eydot_orbit = []
         self.hxdot_orbit = []
         self.hydot_orbit = []
 
+        # Kepler coordinates
+        # https://en.wikipedia.org/wiki/Orbital_elements
+        self.e_orbit = [] # eccentricity
+        self.i_orbit = [] # inclination
+        self.w_orbit = [] # argument of periapsis
+        self.omega_orbit = [] # longitude of ascending node
+        self.v_orbit = [] # true anomaly at epoch
+
         self._sc_fuel = None
         self._extrap_Date = None
         self._targetOrbit = None
-        self.target_px = []
-        self.target_py = []
-        self.target_pz = []
 
         self.total_reward = 0
         self.episode_num = 0
@@ -161,20 +179,24 @@ class OrekitEnv(gym.Env):
         self.seed_target = state_targ
         self.target_hit = False
 
-        # Environment initialization
+        # Environment initialization -----------------------------------
+        # Set Dates
         self.set_date(date)
         self._extrap_Date = self._initial_date
-        self.create_orbit(state, self._initial_date, target=False)
-        self.set_spacecraft(self.initial_mass, self.cuf_fuel_mass)
-        self.create_Propagator()
-        self.setForceModel()
         self.final_date = self._initial_date.shiftedBy(duration)
-        self.create_orbit(state_targ, self.final_date, target=True)
+
+        # create orbits (in Keplerian coordinates)
+        self.create_orbit(state, self._initial_date, target=False)  # create initial orbit (sets self._orbit and self._currentOrbit)
+        self.create_orbit(state_targ, self.final_date, target=True) # create target orbit (sets self._targetOrbit)
+
+        self.set_spacecraft(self.initial_mass, self.cuf_fuel_mass) # sets self._sc_fuel
+        self.create_Propagator() # set self._prop with NumericalPropagator
+        self.setForceModel() # update self._prop to include HolmesFeatherstoneAttractionModel ForceModel
 
         self.stepT = stepT
 
-        # self.action_space = 3  # output thrust directions
         # OpenAI API to define 3D continous action space vector [a,b,c]
+        # Force in radial, circumferential, and normal directions
         self.action_space = spaces.Box(
             low=-0.6,
             high=0.6,
@@ -183,11 +205,14 @@ class OrekitEnv(gym.Env):
         )
         # self.observation_space = 10  # states | Equinoctial components + derivatives
         # OpenAI API
+        # state params + derivatives (could include target in future)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf,shape=(10,),
                                         dtype=np.float32)
         self.action_bound = 0.6  # Max thrust limit
         self._isp = 3100.0 
 
+        # set self.r_target_state and self.r_initial_state with data from _targetOrbit and _orbit 
+        # (originally from state and state_targ parameters)
         self.r_target_state = np.array(
             [self._targetOrbit.getA(), self._targetOrbit.getEquinoctialEx(), self._targetOrbit.getEquinoctialEy(),
              self._targetOrbit.getHx(), self._targetOrbit.getHy(), self._targetOrbit.getLv()])
@@ -197,6 +222,7 @@ class OrekitEnv(gym.Env):
 
         self.r_target_state = self.get_state(self._targetOrbit)
         self.r_initial_state = self.get_state(self._orbit)
+
 
     def set_date(self, date=None, absolute_date=None, step=0):
         """
@@ -217,6 +243,7 @@ class OrekitEnv(gym.Env):
             year, month, day, hour, minute, sec = now.year, now.month, now.day, now.hour, now.minute, float(now.second)
             self._initial_date = AbsoluteDate(year, month, day, hour, minute, sec, UTC)
 
+
     def create_orbit(self, state, date, target=False):
         """
          Crate the initial orbit using Keplarian elements
@@ -225,7 +252,7 @@ class OrekitEnv(gym.Env):
         :param target: a target orbit list [a, e, i, omega, raan, lM]
         :return:
         """
-        a, e, i, omega, raan, lM = state
+        a, e, i, omega, raan, lM = state # get keplerian coordinates
 
         # Add Earth size offset
         a += EARTH_RADIUS
@@ -249,10 +276,11 @@ class OrekitEnv(gym.Env):
             self._currentOrbit = set_orbit
             self._orbit = set_orbit
 
-    def convert_to_keplerian(self, orbit):
 
+    def convert_to_keplerian(self, orbit):
         ko = KeplerianOrbit(orbit)
         return ko
+
 
     def set_spacecraft(self, mass, fuel_mass):
         """
@@ -263,6 +291,7 @@ class OrekitEnv(gym.Env):
         """
         sc_state = SpacecraftState(self._orbit, mass)
         self._sc_fuel = sc_state.addAdditionalState (FUEL_MASS, fuel_mass)
+
 
     def create_Propagator(self):
         """
@@ -305,6 +334,7 @@ class OrekitEnv(gym.Env):
         gravityProvider = GravityFieldFactory.getNormalizedProvider(8, 8)
         self._prop.addForceModel(HolmesFeatherstoneAttractionModel(earth.getBodyFrame(), gravityProvider))
 
+    # required for Gym Env, called when new episode starts
     def reset(self):
         """
         Resets the orekit enviornment
@@ -315,7 +345,7 @@ class OrekitEnv(gym.Env):
         self._currentDate = None
         self._currentOrbit = None
 
-        # Randomizes the initial orbit
+        # Randomizes the initial orbit (initial state +- random variable)
         if self.randomize:
             self._orbit = None
             a_rand = self.seed_state[0]
@@ -392,6 +422,8 @@ class OrekitEnv(gym.Env):
         """
         return self._sc_fuel.getAdditionalState(FUEL_MASS)[0] + self._sc_fuel.getMass()
 
+
+    # return state as list from orbit object
     def get_state(self, orbit, with_derivatives=True):
 
         if with_derivatives:
@@ -406,6 +438,8 @@ class OrekitEnv(gym.Env):
 
         return state
 
+    # takes in action and computes state after action is performed
+    # returns observation, reward, done, info
     def step(self, thrust):
         """
         Take a propagation step
@@ -477,6 +511,7 @@ class OrekitEnv(gym.Env):
         self.hydot_orbit.append(self._currentOrbit.getHyDot())
 
         return np.array(state_1), reward, done, info
+
 
     def dist_reward(self):
         """
