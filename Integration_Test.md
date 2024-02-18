@@ -26,6 +26,14 @@
    - `conda activate "virtual environment name"`
 - Install the main packages using pip with the following command in command prompt: `pip install -r "path/to/requirements.txt"`
 - Install Orekit using conda with the following command in command prompt: `conda install conda-forge::orekit`
+## To Train On GPU (optional)
+- Install CUDA using the command: `conda install cuda -c nvidia`
+   - If using an older graphics card, you may need to install an older version of cuda with the following command: `conda install cuda -c nvidia/label/cuda-VERSION`
+   - To see what version of CUDA you need, check these the second table to find your graphics card, then use the table above to find the CUDA SDK version your GPU can run: https://en.wikipedia.org/wiki/CUDA#GPUs_supported
+- Install pytorch with conda support with the following command: `conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia`
+   - This command may vary depending on updates and the CUDA version installed, a generator for the command can be found at the pytorch website: https://pytorch.org/
+- NOTE: Older versions of CUDA and pytorch-cuda may create inconsistencies with packages in the requirements.txt
+- The program should now print "GPU found" when running main.py. If not, check to make sure your graphics card drivers are updated
 
 ## Analysis Execution (main.py)
 - Define initial state, target state, simulation_date, simulation_duration, spacecraft_mass, and simulation_stepT

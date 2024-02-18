@@ -30,7 +30,7 @@ from stable_baselines3 import TD3, DDPG
 from stable_baselines3.common.noise import NormalActionNoise
 from gym_env import OrekitEnv
 
-print(torch.cuda.is_available())
+print('GPU found') if torch.cuda.is_available() else print('GPU not found')
 
 def train_model(alg, initial_state, target_state, simulation_date, 
                 simulation_duration, spacecraft_mass, simulation_stepT):
@@ -45,9 +45,9 @@ def train_model(alg, initial_state, target_state, simulation_date,
 
    if(alg == "DDPG"):
       # Create the TD3 model
-      model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1, device="cpu", tau=0.01)
+      model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01)
    elif(alg == "TD3"):
-      model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, device="cpu", tau=0.01)
+      model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01)
    else:
       print("Unknown model, check again and run")
       sys.exit()
