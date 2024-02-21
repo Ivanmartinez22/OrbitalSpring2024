@@ -34,6 +34,7 @@ from math import radians, degrees
 import datetime
 import numpy as np
 import os, random
+import time
 
 orekit.initVM()
 
@@ -118,17 +119,17 @@ class OrekitEnv(gym.Env):
         self.id = random.randint(1,100000)
         self.alg = ""
 
-        # satellite position
+        # satellite position at each time step
         self.px = [] # satellite x position
         self.py = [] # satellite y position
         self.pz = [] # satellite z position
 
-        # satellite target position
+        # satellite target position at each time step
         self.target_px = [] # target x
         self.target_py = [] # target y
         self.target_pz = [] # target z
 
-        # state params (used in model)
+        # state params (used in model) at each time step
         self.a_orbit = [] # semimajor axis
         self.ex_orbit = [] # eccentricity x
         self.ey_orbit = [] # eccentricity y
@@ -136,14 +137,14 @@ class OrekitEnv(gym.Env):
         self.hy_orbit = [] # inclination y
         self.lv_orbit = [] # ???
 
-        # rate of change of state params
+        # rate of change of state params at each time step
         self.adot_orbit = []
         self.exdot_orbit = []
         self.eydot_orbit = []
         self.hxdot_orbit = []
         self.hydot_orbit = []
 
-        # Kepler coordinates
+        # Kepler coordinates at each time step
         # https://en.wikipedia.org/wiki/Orbital_elements
         self.e_orbit = [] # eccentricity
         self.i_orbit = [] # inclination
@@ -151,7 +152,7 @@ class OrekitEnv(gym.Env):
         self.omega_orbit = [] # longitude of ascending node
         self.v_orbit = [] # true anomaly at epoch
 
-        self._sc_fuel = None
+        self._sc_state = None
         self._extrap_Date = None
         self._targetOrbit = None
 
@@ -166,7 +167,7 @@ class OrekitEnv(gym.Env):
         # Fuel params
         self.dry_mass = mass[0]
         self.fuel_mass = mass[1]
-        self.cuf_fuel_mass = self.fuel_mass
+        self.curr_fuel_mass = self.fuel_mass
         self.initial_mass = self.dry_mass + self.fuel_mass
 
         # Accpetance tolerance
@@ -186,10 +187,11 @@ class OrekitEnv(gym.Env):
         self.final_date = self._initial_date.shiftedBy(duration)
 
         # create orbits (in Keplerian coordinates)
-        self.create_orbit(state, self._initial_date, target=False)  # create initial orbit (sets self._orbit and self._currentOrbit)
-        self.create_orbit(state_targ, self.final_date, target=True) # create target orbit (sets self._targetOrbit)
+        self.initial_orbit = self.create_orbit(state, self._initial_date)
+        self._currentOrbit = self.create_orbit(state, self._initial_date) # might have to reference same object as _orbit
+        self._targetOrbit= self.create_orbit(state_targ, self.final_date)
 
-        self.set_spacecraft(self.initial_mass, self.cuf_fuel_mass) # sets self._sc_fuel
+        self.set_spacecraft(self.initial_mass, self.curr_fuel_mass) # sets self._sc_state
         self.create_Propagator() # set self._prop with NumericalPropagator
         self.setForceModel() # update self._prop to include HolmesFeatherstoneAttractionModel ForceModel
 
@@ -211,17 +213,10 @@ class OrekitEnv(gym.Env):
         self.action_bound = 0.6  # Max thrust limit
         self._isp = 3100.0 
 
-        # set self.r_target_state and self.r_initial_state with data from _targetOrbit and _orbit 
+        # set self.r_target_state and self.r_initial_state with data from _targetOrbit and _orbit (convert from KeplerianOrbit to np.array)
         # (originally from state and state_targ parameters)
-        self.r_target_state = np.array(
-            [self._targetOrbit.getA(), self._targetOrbit.getEquinoctialEx(), self._targetOrbit.getEquinoctialEy(),
-             self._targetOrbit.getHx(), self._targetOrbit.getHy(), self._targetOrbit.getLv()])
-
-        self.r_initial_state = np.array([self._orbit.getA(), self._orbit.getEquinoctialEx(), self._orbit.getEquinoctialEy(),
-                                  self._orbit.getHx(), self._orbit.getHy(), self._orbit.getLv()])
-
         self.r_target_state = self.get_state(self._targetOrbit)
-        self.r_initial_state = self.get_state(self._orbit)
+        self.r_initial_state = self.get_state(self.initial_orbit)
 
 
     def set_date(self, date=None, absolute_date=None, step=0):
@@ -244,12 +239,11 @@ class OrekitEnv(gym.Env):
             self._initial_date = AbsoluteDate(year, month, day, hour, minute, sec, UTC)
 
 
-    def create_orbit(self, state, date, target=False):
+    def create_orbit(self, state, date):
         """
          Crate the initial orbit using Keplarian elements
         :param state: a state list [a, e, i, omega, raan, lM]
         :param date: A date given as an orekit absolute date object
-        :param target: a target orbit list [a, e, i, omega, raan, lM]
         :return:
         """
         a, e, i, omega, raan, lM = state # get keplerian coordinates
@@ -270,11 +264,7 @@ class OrekitEnv(gym.Env):
                                    aDot, eDot, iDot, paDot, rannDot, anomalyDot,
                                    PositionAngleType.TRUE, inertial_frame, date, MU)
           
-        if target:
-            self._targetOrbit = set_orbit
-        else:
-            self._currentOrbit = set_orbit
-            self._orbit = set_orbit
+        return set_orbit
 
 
     def convert_to_keplerian(self, orbit):
@@ -289,8 +279,8 @@ class OrekitEnv(gym.Env):
         :param fuel_mass:
         :return:
         """
-        sc_state = SpacecraftState(self._orbit, mass)
-        self._sc_fuel = sc_state.addAdditionalState (FUEL_MASS, fuel_mass)
+        sc_state = SpacecraftState(self.initial_orbit, mass)
+        self._sc_state = sc_state.addAdditionalState (FUEL_MASS, fuel_mass)
 
 
     def create_Propagator(self):
@@ -301,24 +291,32 @@ class OrekitEnv(gym.Env):
         minStep = 0.001
         maxStep = 500.0
 
+        # define tolerances of integrator
+        # lower tolerances are more accurate but usually require shorter step times (less efficient, more accurate)
+        # higher tolerances allow larger step times but sacrifice accuracy (more efficient, less accurate)
         position_tolerance = 60.0
-        tolerances = NumericalPropagator.tolerances(position_tolerance, self._orbit, self._orbit.getType())
+        tolerances = NumericalPropagator.tolerances(position_tolerance, self.initial_orbit, self.initial_orbit.getType())
         abs_tolerance = JArray_double.cast_(tolerances[0])
         rel_telerance = JArray_double.cast_(tolerances[1])
 
+        # define integrator
+        # Dormand Prince algorithm is able to adaptively adjust step size
+        # step size used to estimate integration by breaking it into discrete intervals
+        # larger step sizes = more efficient, less accurate
+        # smaller step sizes = less efficient, more accurate
         integrator = DormandPrince853Integrator(minStep, maxStep, abs_tolerance, rel_telerance)
-
         integrator.setInitialStepSize(10.0)
 
+        # create propagator
         numProp = NumericalPropagator(integrator)
-        numProp.setInitialState(self._sc_fuel)
+        numProp.setInitialState(self._sc_state) # self._sc_state also contains data about orbit
         numProp.setMu(MU)
         numProp.setOrbitType(OrbitType.KEPLERIAN)
+        numProp.setAttitudeProvider(attitude)
 
         # numProp.setSlaveMode() # was not commented out before
 
         self._prop = numProp
-        self._prop.setAttitudeProvider(attitude)
 
 
     def setForceModel(self):
@@ -347,7 +345,7 @@ class OrekitEnv(gym.Env):
 
         # Randomizes the initial orbit (initial state +- random variable)
         if self.randomize:
-            self._orbit = None
+            self.initial_orbit = None
             a_rand = self.seed_state[0]
             e_rand = self.seed_state[1]
             w_rand = self.seed_state[3]
@@ -360,19 +358,27 @@ class OrekitEnv(gym.Env):
             w_rand = random.uniform(self.seed_state[3]-self._orbit_randomizer['w'], self._orbit_randomizer['w']+ self.seed_state[3])
             omega_rand = random.uniform(self.seed_state[4]-self._orbit_randomizer['omega'], self._orbit_randomizer['omega']+ self.seed_state[4])
             lv_rand = random.uniform(self.seed_state[5]-self._orbit_randomizer['lv'], self._orbit_randomizer['lv']+ self.seed_state[5])
+            
             state = [a_rand, e_rand, i_rand, w_rand, omega_rand, lv_rand]
-            self.create_orbit(state, self._initial_date, target=False)
-        else:
-            self._currentOrbit = self._orbit
 
+            self.initial_orbit = self.create_orbit(state, self._initial_date)
+            self._currentOrbit = self.create_orbit(state, self._initial_date) # might have to reference same object as _orbit
+        else:
+            self._currentOrbit = self.initial_orbit
+
+        # reset dates
         self._currentDate = self._initial_date
         self._extrap_Date = self._initial_date
 
+        # reset spacecraft state
         self.set_spacecraft(self.initial_mass, self.fuel_mass)
-        self.cuf_fuel_mass = self.fuel_mass
+        self.curr_fuel_mass = self.fuel_mass
+
+        # create propagator and force model
         self.create_Propagator()
         self.setForceModel()
 
+        # recreate arrays for post analysis
         self.px = []
         self.py = []
         self.pz = []
@@ -400,11 +406,11 @@ class OrekitEnv(gym.Env):
         self.actions = []
         self.thrust_mags = []
 
-        state = np.array([self._orbit.getA() / self.r_target_state[0],
-                          self._orbit.getEquinoctialEx(),
-                          self._orbit.getEquinoctialEy(),
-                          self._orbit.getHx(),
-                          self._orbit.getHy(), 0, 0, 0, 0, 0])
+        state = np.array([self.initial_orbit.getA() / self.r_target_state[0],
+                          self.initial_orbit.getEquinoctialEx(),
+                          self.initial_orbit.getEquinoctialEy(),
+                          self.initial_orbit.getHx(),
+                          self.initial_orbit.getHy(), 0, 0, 0, 0, 0])
 
         print("RESET: ", self.total_reward)
         if self.total_reward != 0:
@@ -420,7 +426,7 @@ class OrekitEnv(gym.Env):
         Get the total mass of the spacecraft
         :return: dry mass + fuel mass (kg)
         """
-        return self._sc_fuel.getAdditionalState(FUEL_MASS)[0] + self._sc_fuel.getMass()
+        return self._sc_state.getAdditionalState(FUEL_MASS)[0] + self._sc_state.getMass()
 
 
     # return state as list from orbit object
@@ -449,7 +455,7 @@ class OrekitEnv(gym.Env):
         thrust_mag = np.linalg.norm(thrust)
         thrust_dir = thrust / thrust_mag
         DIRECTION = Vector3D(float(thrust_dir[0]), float(thrust_dir[1]), float(thrust_dir[2]))
-        # print(thrust)
+        
         if thrust_mag <= 0:
             # DIRECTION = Vector3D.MINUS_J
             thrust_mag = abs(float(thrust_mag))
@@ -460,10 +466,11 @@ class OrekitEnv(gym.Env):
         # Add force model
         thrust_force = ConstantThrustManeuver(self._extrap_Date, self.stepT, thrust_mag, self._isp, attitude, DIRECTION)
         self._prop.addForceModel(thrust_force)
+
         # Propagate
         currentState = self._prop.propagate(self._extrap_Date.shiftedBy(self.stepT))
 
-        self.cuf_fuel_mass = currentState.getMass() - self.dry_mass
+        self.curr_fuel_mass = currentState.getMass() - self.dry_mass
         self._currentDate = currentState.getDate()
         self._extrap_Date = self._currentDate
         self._currentOrbit = currentState.getOrbit()
@@ -491,6 +498,12 @@ class OrekitEnv(gym.Env):
         self.actions.append(thrust)
         self.thrust_mags.append(thrust_mag)
 
+        self.adot_orbit.append(self._currentOrbit.getADot())
+        self.exdot_orbit.append(self._currentOrbit.getEquinoctialExDot())
+        self.eydot_orbit.append(self._currentOrbit.getEquinoctialEyDot())
+        self.hxdot_orbit.append(self._currentOrbit.getHxDot())
+        self.hydot_orbit.append(self._currentOrbit.getHyDot())
+
         # Calc reward / termination state for this step
         reward, done = self.dist_reward() # was self.dist_reward(thrust)
 
@@ -504,12 +517,6 @@ class OrekitEnv(gym.Env):
         # OpenAI debug option
         info = {}
 
-        self.adot_orbit.append(self._currentOrbit.getADot())
-        self.exdot_orbit.append(self._currentOrbit.getEquinoctialExDot())
-        self.eydot_orbit.append(self._currentOrbit.getEquinoctialEyDot())
-        self.hxdot_orbit.append(self._currentOrbit.getHxDot())
-        self.hydot_orbit.append(self._currentOrbit.getHyDot())
-
         return np.array(state_1), reward, done, info
 
 
@@ -522,9 +529,7 @@ class OrekitEnv(gym.Env):
 
         done = False
 
-
-        state = np.array([self._currentOrbit.getA(), self._currentOrbit.getEquinoctialEx(), self._currentOrbit.getEquinoctialEy(),
-                          self._currentOrbit.getHx(), self._currentOrbit.getHy(), self._currentOrbit.getLv()])
+        state = self.get_state(self._currentOrbit, with_derivatives=False)
 
         reward_a = np.sqrt((self.r_target_state[0] - state[0])**2) / self.r_target_state[0]
         reward_ex = np.sqrt((self.r_target_state[1] - state[1])**2)
@@ -550,7 +555,7 @@ class OrekitEnv(gym.Env):
             return reward, done
 
         # Out of fuel
-        if self.cuf_fuel_mass <= 0:
+        if self.curr_fuel_mass <= 0:
             print('Ran out of fuel')
             done = True
             reward = -1
@@ -604,7 +609,7 @@ class OrekitEnv(gym.Env):
 
         # Action file
         with open("results/action/"+str(self.id)+"_"+self.alg+"_action_"+str(self.episode_num)+".txt", 'w') as f:
-            f.write("Fuel Mass: " + str(self.cuf_fuel_mass) + "/" + str(self.fuel_mass) + '\n')
+            f.write("Fuel Mass: " + str(self.curr_fuel_mass) + "/" + str(self.fuel_mass) + '\n')
             for i in range(len(self.actions)):
                 for j in range(3):
                     try:
