@@ -131,13 +131,13 @@ class OrekitEnv(gym.Env):
         self.target_py = [] # target y
         self.target_pz = [] # target z
 
-        # state params (used in model) at each time step
+        # model parameters (equinoctial elements) at each time step
         self.a_orbit = [] # semimajor axis
         self.ex_orbit = [] # eccentricity x
         self.ey_orbit = [] # eccentricity y
-        self.hx_orbit = [] # inclination x
-        self.hy_orbit = [] # inclination y
-        self.lv_orbit = [] # ???
+        self.hx_orbit = [] # angular momentum x
+        self.hy_orbit = [] # angular momentum y
+        self.lv_orbit = [] # true longitude and latitude
 
         # rate of change of state params at each time step
         self.adot_orbit = []
@@ -212,9 +212,10 @@ class OrekitEnv(gym.Env):
             dtype=np.float32
         )
         # self.observation_space = 10  # states | Equinoctial components + derivatives
+        #   changing to 17: 6 for current equinoctial components, 6 for current derivatives, 5 for target equinoctial components (minus lv)
         # OpenAI API
         # state params + derivatives (could include target in future)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf,shape=(10,),
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf,shape=(17,),
                                         dtype=np.float32)
         self.action_bound = 0.6  # Max thrust limit
         self._isp = 3100.0 
@@ -409,17 +410,25 @@ class OrekitEnv(gym.Env):
         self.omega_orbit = []
         self.v_orbit = []
 
+        total_actions = len(self.actions)
+
         self.actions = []
         self.thrust_mags = []
+
+        # state = np.array([self.initial_orbit.getA() / self.r_target_state[0],
+        #                   self.initial_orbit.getEquinoctialEx(),
+        #                   self.initial_orbit.getEquinoctialEy(),
+        #                   self.initial_orbit.getHx(),
+        #                   self.initial_orbit.getHy(), 0, 0, 0, 0, 0])
+
+        curr_state = self.get_state(self._currentOrbit, with_derivatives=False)
+        curr_state = np.append(curr_state, np.array([0, 0, 0, 0, 0, 0]))
+        target_state = self.get_state(self._targetOrbit, with_derivatives=False)[:-1]
+        state = np.append(curr_state, target_state)
+
+        print("RESET: ", self.total_reward, self.n_actions, total_actions)
         self.n_actions = 0
 
-        state = np.array([self.initial_orbit.getA() / self.r_target_state[0],
-                          self.initial_orbit.getEquinoctialEx(),
-                          self.initial_orbit.getEquinoctialEy(),
-                          self.initial_orbit.getHx(),
-                          self.initial_orbit.getHy(), 0, 0, 0, 0, 0])
-
-        print("RESET: ", self.total_reward)
         if self.total_reward != 0:
             self.episode_reward.append(self.total_reward) 
         self.total_reward = 0
@@ -437,6 +446,7 @@ class OrekitEnv(gym.Env):
 
 
     # return state as list from orbit object
+    # state using the equinoctial elements
     def get_state(self, orbit, with_derivatives=True):
 
         if with_derivatives:
@@ -459,10 +469,8 @@ class OrekitEnv(gym.Env):
         :param input: 3D velocity vector (m/s, float)
         :return: spacecraft state (np.array), reward value (float), done (bool)
         """
-        # thrust_mag = np.linalg.norm(thrust)
-        # thrust_dir = thrust / thrust_mag
-        # DIRECTION = Vector3D(float(thrust_dir[0]), float(thrust_dir[1]), float(thrust_dir[2]))
-        # vel = Vector3D(float(vel[0]), float(vel[1]), float(vel[2]))
+        self._prevOrbit = self._currentOrbit
+        self.did_action = False
 
         # radial, tangential, normal (not sure what order)
         vel = Vector3D(float(input[0])*100, float(input[1])*100, float(input[2])*100)
@@ -477,17 +485,30 @@ class OrekitEnv(gym.Env):
             impulse = ImpulseManeuver(event_detector, attitude, vel, self._isp) # applies velocity vector when event triggered
             self._prop.addEventDetector(impulse) # add detector to propagator
             self.n_actions += 1
+            self.did_action = True
 
         # Propagate
-        currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(self.stepT)))
+        try:
+            currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(5000)))
+        except: 
+            print('orekit error')
+            # state_1 = [(self._currentOrbit.getA()) / self.r_target_state[0],
+            #        self._currentOrbit.getEquinoctialEx(), self._currentOrbit.getEquinoctialEy(),
+            #        self._currentOrbit.getHx(), self._currentOrbit.getHy(),
+            #        self._currentOrbit.getADot(), self._currentOrbit.getEquinoctialExDot(),
+            #        self._currentOrbit.getEquinoctialEyDot(),
+            #        self._currentOrbit.getHxDot(), self._currentOrbit.getHyDot()
+            #        ]
+            state = self.get_state(self._currentOrbit, with_derivatives=True)
+            state = np.append(state, self.get_state(self._targetOrbit, with_derivatives=False))[:-1]
+            return state, -1, True, {}
+        
 
         self.curr_fuel_mass = currentState.getMass() - self.dry_mass
         self._currentDate = currentState.getDate()
         self._extrap_Date = self._currentDate
         self._currentOrbit = currentState.getOrbit()
         coord = currentState.getPVCoordinates().getPosition()
-
-        
 
         # Saving for post analysis
         self.px.append(coord.getX())
@@ -524,20 +545,26 @@ class OrekitEnv(gym.Env):
         reward, done = self.dist_reward() # was self.dist_reward(thrust)
 
         # penalize doing nothing
-        if done and self.n_actions == 0:
-            reward = -100000000
+        # if done and self.n_actions == 0:
+        #     reward = -100000000
+        #     self.total_reward += reward
+        # if done:
+        #     reward -= self.n_actions * 1000
+        #     self.total_reward += reward
 
-        state_1 = [(self._currentOrbit.getA()) / self.r_target_state[0],
-                   self._currentOrbit.getEquinoctialEx(), self._currentOrbit.getEquinoctialEy(),
-                   self._currentOrbit.getHx(), self._currentOrbit.getHy(),
-                   self._currentOrbit.getADot(), self._currentOrbit.getEquinoctialExDot(),
-                   self._currentOrbit.getEquinoctialEyDot(),
-                   self._currentOrbit.getHxDot(), self._currentOrbit.getHyDot()
-                   ]
+        # state_1 = [(self._currentOrbit.getA()) / self.r_target_state[0],
+        #            self._currentOrbit.getEquinoctialEx(), self._currentOrbit.getEquinoctialEy(),
+        #            self._currentOrbit.getHx(), self._currentOrbit.getHy(),
+        #            self._currentOrbit.getADot(), self._currentOrbit.getEquinoctialExDot(),
+        #            self._currentOrbit.getEquinoctialEyDot(),
+        #            self._currentOrbit.getHxDot(), self._currentOrbit.getHyDot()
+        #            ]
+        
+        state = self.get_state(self._currentOrbit, with_derivatives=True)
+        state = np.append(state, self.get_state(self._targetOrbit, with_derivatives=False))[:-1]
         # OpenAI debug option
         info = {}
-
-        return np.array(state_1), reward, done, info
+        return np.array(state), reward, done, info
 
 
     def dist_reward(self):
@@ -551,13 +578,67 @@ class OrekitEnv(gym.Env):
 
         state = self.get_state(self._currentOrbit, with_derivatives=False)
 
-        reward_a = np.sqrt((self.r_target_state[0] - state[0])**2) / self.r_target_state[0]
-        reward_ex = np.sqrt((self.r_target_state[1] - state[1])**2)
-        reward_ey = np.sqrt((self.r_target_state[2] - state[2])**2)
-        reward_hx = np.sqrt((self.r_target_state[3] - state[3])**2)
-        reward_hy = np.sqrt((self.r_target_state[4] - state[4])**2)
+        prev_k = self.convert_to_keplerian(self._prevOrbit)
+        curr_k = self.convert_to_keplerian(self._currentOrbit)
+        target_k = self.convert_to_keplerian(self._targetOrbit)
 
-        reward = -(reward_a + reward_hx*10 + reward_hy*10 + reward_ex + reward_ey)
+        prev_dist = np.zeros(5)
+        curr_dist = np.zeros(5)
+
+        prev_dist[0] = np.sqrt((target_k.getA() - prev_k.getA())**2) / target_k.getA()
+        prev_dist[1] = np.sqrt((target_k.getE() - prev_k.getE())**2) / target_k.getE()
+        prev_dist[2] = np.sqrt((target_k.getI() - prev_k.getI())**2) / target_k.getI()
+        prev_dist[3] = np.sqrt((target_k.getPerigeeArgument() - prev_k.getPerigeeArgument())**2) / target_k.getPerigeeArgument()
+        prev_dist[4] = np.sqrt((target_k.getRightAscensionOfAscendingNode() - prev_k.getRightAscensionOfAscendingNode())**2) / target_k.getRightAscensionOfAscendingNode()
+        # prev_dist_value = np.linalg.norm(prev_dist)
+        prev_dist_value = np.sum(prev_dist)
+
+        curr_dist[0] = np.sqrt((target_k.getA() - curr_k.getA())**2) / target_k.getA()
+        curr_dist[1] = np.sqrt((target_k.getE() - curr_k.getE())**2) / target_k.getE()
+        curr_dist[2] = np.sqrt((target_k.getI() - curr_k.getI())**2) / target_k.getI()
+        curr_dist[3] = np.sqrt((target_k.getPerigeeArgument() - curr_k.getPerigeeArgument())**2) / target_k.getPerigeeArgument()
+        curr_dist[4] = np.sqrt((target_k.getRightAscensionOfAscendingNode() - curr_k.getRightAscensionOfAscendingNode())**2) / target_k.getRightAscensionOfAscendingNode()
+        # curr_dist_value = np.linalg.norm(curr_dist)
+        curr_dist_value = np.sum(curr_dist)
+
+        no_action_death = -1000000 if self.n_actions == 0 else 0
+        action_multiplier = 100 if self.did_action else 10
+        distance_change_reward = (prev_dist_value - curr_dist_value) * action_multiplier
+        action_penalty = self.n_actions * 10
+
+        reward = no_action_death + distance_change_reward - curr_dist_value - action_penalty
+
+        # if self.did_action:
+        #     print('\n')
+        #     print('actions:', self.n_actions)
+
+        #     print('prev orbit:', self._prevOrbit)
+        #     print('current orbit:', self._currentOrbit)
+        #     print('target orbit:', self._targetOrbit)
+
+        #     print('prev distance:', prev_dist_value)
+        #     print(prev_dist)
+        #     print('current distance:', curr_dist_value)
+        #     print(curr_dist)
+
+        #     print('distance change reward:', distance_change_reward)
+        #     print('action penalty:', action_penalty)
+        #     print('reward:', reward)
+
+        # reward_a = np.sqrt((self.r_target_state[0] - state[0])**2) / self.r_target_state[0]
+        # reward_ex = np.sqrt((self.r_target_state[1] - state[1])**2)
+        # reward_ey = np.sqrt((self.r_target_state[2] - state[2])**2)
+        # reward_hx = np.sqrt((self.r_target_state[3] - state[3])**2)
+        # reward_hy = np.sqrt((self.r_target_state[4] - state[4])**2)
+
+        # reward_a2 = np.sqrt((self.r_initial_state[0] - state[0])**2) / self.r_initial_state[0]
+        # reward_ex2 = np.sqrt((self.r_initial_state[1] - state[1])**2)
+        # reward_ey2 = np.sqrt((self.r_initial_state[2] - state[2])**2)
+        # reward_hx2 = np.sqrt((self.r_initial_state[3] - state[3])**2)
+        # reward_hy2 = np.sqrt((self.r_initial_state[4] - state[4])**2)
+
+        # reward = -(reward_a + reward_hx*10 + reward_hy*10 + reward_ex + reward_ey) * self.n_actions
+        # print(reward)
 
         # TERMINAL STATES
         # Target state (with tolerance)
@@ -566,7 +647,7 @@ class OrekitEnv(gym.Env):
            abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] and \
            abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx'] and \
            abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
-            reward += 1
+            reward = 1
             done = True
             print('hit')
             self.target_hit = True
@@ -577,23 +658,25 @@ class OrekitEnv(gym.Env):
         # Out of fuel
         if self.curr_fuel_mass <= 0:
             print('Ran out of fuel')
+            print(curr_dist_value)
             done = True
-            reward = -1
             return reward, done
 
         # Crash into Earth
         if self._currentOrbit.getA() < EARTH_RADIUS:
-            reward = -1
+            reward *= 100
             done = True
             print('In earth')
+            print(curr_dist_value)
             return reward, done
 
         # Mission duration exceeded
         if self._extrap_Date.compareTo(self.final_date) >= 0:
-            reward = -1
+            # reward *= self.n_actions
             print("Out of time")
-            # self.write_state() DEBUG
+            print(curr_dist_value)
             done = True
+            return reward, done
 
         self.total_reward += reward
 

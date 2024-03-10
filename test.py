@@ -9,4 +9,4 @@ spacecraft_mass = [500.0, 150.0]
 timestep = 53*60+44
 env = OrekitEnv(initial_state, target_state, simulation_date, simulation_duration, spacecraft_mass, timestep)
 
-env.step([0, 24.064152, 0])
+env.step([0, 24.064152, 0, 0])

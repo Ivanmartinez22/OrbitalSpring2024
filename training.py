@@ -45,7 +45,7 @@ def train_model(alg, initial_state, target_state, simulation_date,
 
    if(alg == "DDPG"):
       # Create the TD3 model
-      model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01)
+      model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01, train_freq=(1, 'episode'))
    elif(alg == "TD3"):
       model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01)
    else:
