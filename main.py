@@ -30,7 +30,7 @@ testEnvironment()
 
 # Page 35 RP(A Reinforcement Learning Approach to Spacecraft Trajectory);
 # [a(m), e, i(deg), omega/w(deg), Omega/raan(deg), TrueAnomaly(v)]
-initial_state = [5500*1e3, 0.20,5.0, 20.0, 20.0,10.0]
+initial_state = [5500*1e3, 0.20,5.0, 20.0, 20.0, 10.0]
 target_state = [6300*1e3, 0.23, 5.3, 24.0, 24.0, 10.0]
 simulation_date = [2018, 2, 16, 12, 10, 0.0]
 simulation_duration = 24.0 * 60.0 ** 2 * 4
