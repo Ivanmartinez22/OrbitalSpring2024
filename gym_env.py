@@ -30,7 +30,7 @@ import gym
 from gym import spaces
 
 import orekit
-from math import radians, degrees
+from math import radians, degrees, pi
 import datetime
 import numpy as np
 import os, random
@@ -212,10 +212,10 @@ class OrekitEnv(gym.Env):
             dtype=np.float32
         )
         # self.observation_space = 10  # states | Equinoctial components + derivatives
-        #   changing to 17: 6 for current equinoctial components, 6 for current derivatives, 5 for target equinoctial components (minus lv)
+        #   changing to 18: 6 for current equinoctial components, 6 for current derivatives, 5 for target equinoctial components (minus lv), 1 for n_actions
         # OpenAI API
         # state params + derivatives (could include target in future)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf,shape=(17,),
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf,shape=(18,),
                                         dtype=np.float32)
         self.action_bound = 0.6  # Max thrust limit
         self._isp = 3100.0 
@@ -425,6 +425,7 @@ class OrekitEnv(gym.Env):
         curr_state = np.append(curr_state, np.array([0, 0, 0, 0, 0, 0]))
         target_state = self.get_state(self._targetOrbit, with_derivatives=False)[:-1]
         state = np.append(curr_state, target_state)
+        state = np.append(state, 0)
 
         print("RESET: ", self.total_reward, self.n_actions, total_actions)
         self.n_actions = 0
@@ -501,6 +502,7 @@ class OrekitEnv(gym.Env):
             #        ]
             state = self.get_state(self._currentOrbit, with_derivatives=True)
             state = np.append(state, self.get_state(self._targetOrbit, with_derivatives=False))[:-1]
+            state = np.append(state, self.n_actions)
             return state, -1, True, {}
         
 
@@ -562,9 +564,17 @@ class OrekitEnv(gym.Env):
         
         state = self.get_state(self._currentOrbit, with_derivatives=True)
         state = np.append(state, self.get_state(self._targetOrbit, with_derivatives=False))[:-1]
+        state = np.append(state, self.n_actions)
         # OpenAI debug option
         info = {}
         return np.array(state), reward, done, info
+    
+
+    # compute the difference between 2 angles
+    def angle_diff(self, angle1, angle2):
+        diff = angle2 - angle1
+        diff = (diff + pi) % (2 * pi) - pi
+        return diff
 
 
     def dist_reward(self):
@@ -586,35 +596,46 @@ class OrekitEnv(gym.Env):
         curr_dist = np.zeros(5)
 
         prev_dist[0] = np.sqrt((target_k.getA() - prev_k.getA())**2) / target_k.getA()
-        prev_dist[1] = np.sqrt((target_k.getE() - prev_k.getE())**2) / target_k.getE()
-        prev_dist[2] = np.sqrt((target_k.getI() - prev_k.getI())**2) / target_k.getI()
-        prev_dist[3] = np.sqrt((target_k.getPerigeeArgument() - prev_k.getPerigeeArgument())**2) / target_k.getPerigeeArgument()
-        prev_dist[4] = np.sqrt((target_k.getRightAscensionOfAscendingNode() - prev_k.getRightAscensionOfAscendingNode())**2) / target_k.getRightAscensionOfAscendingNode()
+        prev_dist[1] = np.sqrt((target_k.getE() - prev_k.getE())**2)
+        prev_dist[2] = np.sqrt((self.angle_diff(target_k.getI(), prev_k.getI()))**2)
+        prev_dist[3] = np.sqrt((self.angle_diff(target_k.getPerigeeArgument(), prev_k.getPerigeeArgument()))**2)
+        prev_dist[4] = np.sqrt((self.angle_diff(target_k.getRightAscensionOfAscendingNode(), prev_k.getRightAscensionOfAscendingNode()))**2)
         # prev_dist_value = np.linalg.norm(prev_dist)
         prev_dist_value = np.sum(prev_dist)
 
         curr_dist[0] = np.sqrt((target_k.getA() - curr_k.getA())**2) / target_k.getA()
-        curr_dist[1] = np.sqrt((target_k.getE() - curr_k.getE())**2) / target_k.getE()
-        curr_dist[2] = np.sqrt((target_k.getI() - curr_k.getI())**2) / target_k.getI()
-        curr_dist[3] = np.sqrt((target_k.getPerigeeArgument() - curr_k.getPerigeeArgument())**2) / target_k.getPerigeeArgument()
-        curr_dist[4] = np.sqrt((target_k.getRightAscensionOfAscendingNode() - curr_k.getRightAscensionOfAscendingNode())**2) / target_k.getRightAscensionOfAscendingNode()
+        curr_dist[1] = np.sqrt((target_k.getE() - curr_k.getE())**2)
+        curr_dist[2] = np.sqrt((self.angle_diff(target_k.getI(), curr_k.getI()))**2)
+        curr_dist[3] = np.sqrt((self.angle_diff(target_k.getPerigeeArgument(), curr_k.getPerigeeArgument()))**2)
+        curr_dist[4] = np.sqrt((self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode()))**2)
         # curr_dist_value = np.linalg.norm(curr_dist)
         curr_dist_value = np.sum(curr_dist)
 
         no_action_death = -1000000 if self.n_actions == 0 else 0
-        action_multiplier = 100 if self.did_action else 10
+        # action_multiplier = 100 if self.did_action else 10
+        action_multiplier = 1
         distance_change_reward = (prev_dist_value - curr_dist_value) * action_multiplier
-        action_penalty = self.n_actions * 10
+        # action_penalty = self.n_actions * 10
+        action_penalty = 0.2
 
-        reward = no_action_death + distance_change_reward - curr_dist_value - action_penalty
+        reward = no_action_death + distance_change_reward - action_penalty
 
-        # if self.did_action:
+        # print(distance_change_reward)
+        # print(curr_dist_value)
+
+        # if abs(distance_change_reward) > 5:
+        #     # JUMP DUE TO NEGATIVE / POSITIVE ANGLE MEASURES
         #     print('\n')
+        #     print(self._prevOrbit)
+        #     print(prev_k)
+        #     print(f'[{prev_k.getA()}, {prev_k.getE()}, {prev_k.getI()}, {prev_k.getPerigeeArgument()}, {prev_k.getRightAscensionOfAscendingNode()}]')
+        #     print('\n')
+
         #     print('actions:', self.n_actions)
 
-        #     print('prev orbit:', self._prevOrbit)
-        #     print('current orbit:', self._currentOrbit)
-        #     print('target orbit:', self._targetOrbit)
+        #     print('prev orbit:', self._prevOrbit, '\n', prev_k)
+        #     print('current orbit:', self._currentOrbit, '\n', curr_k)
+        #     print('target orbit:', self._targetOrbit, '\n',  target_k)
 
         #     print('prev distance:', prev_dist_value)
         #     print(prev_dist)
@@ -624,6 +645,7 @@ class OrekitEnv(gym.Env):
         #     print('distance change reward:', distance_change_reward)
         #     print('action penalty:', action_penalty)
         #     print('reward:', reward)
+        #     print('\n')
 
         # reward_a = np.sqrt((self.r_target_state[0] - state[0])**2) / self.r_target_state[0]
         # reward_ex = np.sqrt((self.r_target_state[1] - state[1])**2)
