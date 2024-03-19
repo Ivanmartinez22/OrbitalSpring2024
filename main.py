@@ -24,7 +24,7 @@
 # *****************************************************************************
 
 from testing.env_test import checkPackageVersion, testEnvironment
-from training import train_model
+from training import train_model, load_model, predict
 
 testEnvironment()
 
@@ -38,5 +38,16 @@ spacecraft_mass = [500.0, 150.0]
 # Let Spacecraft take an action every (step) amount of seconds
 simulation_stepT = 500.0
 
-train_model("TD3", initial_state, target_state, simulation_date, 
-            simulation_duration, spacecraft_mass, simulation_stepT)
+user_viz_in = input("Turn on Live visualizer for predictions and training (y/n): ")
+user_train_predict_in = input("Enter 1 for predict, Enter 2 for training: ")
+visualize = False
+if user_viz_in == "y":
+    visualize = True
+
+if user_train_predict_in == "1":
+    model = load_model('PPO', 'models/97164_PPO_model')
+    predict(model, initial_state, target_state, simulation_date, 
+                simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+else:
+    train_model("TD3", initial_state, target_state, simulation_date, 
+                simulation_duration, spacecraft_mass, simulation_stepT, visualize)
