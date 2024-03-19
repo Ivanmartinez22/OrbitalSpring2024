@@ -711,19 +711,17 @@ class OrekitEnv(gym.Env):
         self.did_action = False
 
         # radial, tangential, normal (not sure what order)
-        vel = Vector3D(float(input[0])*100, float(input[1])*100, float(input[2])*100)
-        thrust_bool = input[3] > 0 # model decides if it actually does performs a maneuver
+        input = [float(input[0])*100, float(input[1])*100, float(input[2])*100] # scale values [-100, 100]
+        input = [0 if abs(item) <= 3 else item for item in input] # values less than 3 are now 0
+        vel = Vector3D(input)
 
         # Remove previous event detectors
         self._prop.clearEventsDetectors()
 
         # Add force model
-        if thrust_bool:
-            event_detector = DateDetector(self._extrap_Date.shiftedBy(0.01)) # detects when date is reached during propagation
-            impulse = ImpulseManeuver(event_detector, attitude, vel, self._isp) # applies velocity vector when event triggered
-            self._prop.addEventDetector(impulse) # add detector to propagator
-            self.n_actions += 1
-            self.did_action = True
+        event_detector = DateDetector(self._extrap_Date.shiftedBy(0.01)) # detects when date is reached during propagation
+        impulse = ImpulseManeuver(event_detector, attitude, vel, self._isp) # applies velocity vector when event triggered
+        self._prop.addEventDetector(impulse) # add detector to propagator
 
         # Propagate
         try:
@@ -828,20 +826,9 @@ class OrekitEnv(gym.Env):
 
         state = self.get_state(self._currentOrbit, with_derivatives=False)
 
-        prev_k = self.convert_to_keplerian(self._prevOrbit)
         curr_k = self.convert_to_keplerian(self._currentOrbit)
         target_k = self.convert_to_keplerian(self._targetOrbit)
-
-        prev_dist = np.zeros(5)
         curr_dist = np.zeros(5)
-
-        prev_dist[0] = (target_k.getA() - prev_k.getA()) / target_k.getA()
-        prev_dist[1] = target_k.getE() - prev_k.getE()
-        prev_dist[2] = self.angle_diff(target_k.getI(), prev_k.getI())
-        prev_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), prev_k.getPerigeeArgument())
-        prev_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), prev_k.getRightAscensionOfAscendingNode())
-        prev_dist_value = np.linalg.norm(prev_dist)
-        # prev_dist_value = np.sum(prev_dist)
 
         curr_dist[0] = (target_k.getA() - curr_k.getA()) / target_k.getA()
         curr_dist[1] = target_k.getE() - curr_k.getE()
@@ -849,22 +836,8 @@ class OrekitEnv(gym.Env):
         curr_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), curr_k.getPerigeeArgument())
         curr_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode())
         curr_dist_value = np.linalg.norm(curr_dist)
-        # curr_dist_value = np.sum(curr_dist)
 
-        # how many actions are we aiming for?
-        min_actions = 4
-        max_actions = 10
-        if self.n_actions < min_actions:
-            total_action_penalty = -10 * (min_actions - self.n_actions) ** 3
-        elif self.n_actions > max_actions:
-            total_action_penalty = -5 * (self.n_actions - max_actions)
-        else:
-            total_action_penalty = 0
-
-        action_penalty = 0.2 if self.did_action else 0 # if did an action subtract value that only rewards above certain threshold of improvement
-        distance_change_reward = (prev_dist_value - curr_dist_value) - action_penalty # reward being closer than the previous
-
-        reward = distance_change_reward - curr_dist_value
+        reward = curr_dist_value
 
         # print(distance_change_reward)
         # print(curr_dist_value)
