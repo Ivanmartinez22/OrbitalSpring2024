@@ -595,30 +595,36 @@ class OrekitEnv(gym.Env):
         prev_dist = np.zeros(5)
         curr_dist = np.zeros(5)
 
-        prev_dist[0] = np.sqrt((target_k.getA() - prev_k.getA())**2) / target_k.getA()
-        prev_dist[1] = np.sqrt((target_k.getE() - prev_k.getE())**2)
-        prev_dist[2] = np.sqrt((self.angle_diff(target_k.getI(), prev_k.getI()))**2)
-        prev_dist[3] = np.sqrt((self.angle_diff(target_k.getPerigeeArgument(), prev_k.getPerigeeArgument()))**2)
-        prev_dist[4] = np.sqrt((self.angle_diff(target_k.getRightAscensionOfAscendingNode(), prev_k.getRightAscensionOfAscendingNode()))**2)
-        # prev_dist_value = np.linalg.norm(prev_dist)
-        prev_dist_value = np.sum(prev_dist)
+        prev_dist[0] = (target_k.getA() - prev_k.getA()) / target_k.getA()
+        prev_dist[1] = target_k.getE() - prev_k.getE()
+        prev_dist[2] = self.angle_diff(target_k.getI(), prev_k.getI())
+        prev_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), prev_k.getPerigeeArgument())
+        prev_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), prev_k.getRightAscensionOfAscendingNode())
+        prev_dist_value = np.linalg.norm(prev_dist)
+        # prev_dist_value = np.sum(prev_dist)
 
-        curr_dist[0] = np.sqrt((target_k.getA() - curr_k.getA())**2) / target_k.getA()
-        curr_dist[1] = np.sqrt((target_k.getE() - curr_k.getE())**2)
-        curr_dist[2] = np.sqrt((self.angle_diff(target_k.getI(), curr_k.getI()))**2)
-        curr_dist[3] = np.sqrt((self.angle_diff(target_k.getPerigeeArgument(), curr_k.getPerigeeArgument()))**2)
-        curr_dist[4] = np.sqrt((self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode()))**2)
-        # curr_dist_value = np.linalg.norm(curr_dist)
-        curr_dist_value = np.sum(curr_dist)
+        curr_dist[0] = (target_k.getA() - curr_k.getA()) / target_k.getA()
+        curr_dist[1] = target_k.getE() - curr_k.getE()
+        curr_dist[2] = self.angle_diff(target_k.getI(), curr_k.getI())
+        curr_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), curr_k.getPerigeeArgument())
+        curr_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode())
+        curr_dist_value = np.linalg.norm(curr_dist)
+        # curr_dist_value = np.sum(curr_dist)
 
-        no_action_death = -1000000 if self.n_actions == 0 else 0
-        # action_multiplier = 100 if self.did_action else 10
-        action_multiplier = 1
-        distance_change_reward = (prev_dist_value - curr_dist_value) * action_multiplier
-        # action_penalty = self.n_actions * 10
-        action_penalty = 0.2
+        # how many actions are we aiming for?
+        min_actions = 4
+        max_actions = 10
+        if self.n_actions < min_actions:
+            total_action_penalty = -10 * (min_actions - self.n_actions) ** 3
+        elif self.n_actions > max_actions:
+            total_action_penalty = -5 * (self.n_actions - max_actions)
+        else:
+            total_action_penalty = 0
 
-        reward = no_action_death + distance_change_reward - action_penalty
+        action_penalty = 0.2 if self.did_action else 0 # if did an action subtract value that only rewards above certain threshold of improvement
+        distance_change_reward = (prev_dist_value - curr_dist_value) - action_penalty # reward being closer than the previous
+
+        reward = distance_change_reward - curr_dist_value
 
         # print(distance_change_reward)
         # print(curr_dist_value)
@@ -669,34 +675,35 @@ class OrekitEnv(gym.Env):
            abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] and \
            abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx'] and \
            abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
-            reward = 1
+            reward = 10 # multiply by % fuel left
             done = True
             print('hit')
             self.target_hit = True
             # Create state file for successful mission
-            self.write_state()
+            self.write_state(curr_dist_value)
             return reward, done
 
         # Out of fuel
         if self.curr_fuel_mass <= 0:
             print('Ran out of fuel')
             print(curr_dist_value)
+            reward = total_action_penalty
             done = True
             return reward, done
 
         # Crash into Earth
         if self._currentOrbit.getA() < EARTH_RADIUS:
-            reward *= 100
-            done = True
             print('In earth')
             print(curr_dist_value)
+            reward = total_action_penalty
+            done = True
             return reward, done
 
         # Mission duration exceeded
         if self._extrap_Date.compareTo(self.final_date) >= 0:
-            # reward *= self.n_actions
             print("Out of time")
             print(curr_dist_value)
+            reward = total_action_penalty
             done = True
             return reward, done
 
@@ -707,11 +714,14 @@ class OrekitEnv(gym.Env):
 
     # State/Action Output files
 
-    def write_state(self):
+    def write_state(self, distance):
         # State file (Equinoctial)
         with open("results/state/"+str(self.id)+"_"+self.alg+"_state_equinoctial_"+str(self.episode_num)+".txt", "w") as f:
             #Add episode number line 1
             f.write("Episode: " + str(self.episode_num) + '\n')
+            f.write('Actions: ' + str(self.n_actions))
+            f.write('Distance: ' + str(distance))
+            f.write('Total Reward: ' + str(self.total_reward))
             for i in range(len(self.a_orbit)):
                 try:
                     f.write(str(self.a_orbit[i]/1e3)+","+str(self.ex_orbit[i])+","+str(self.ey_orbit[i])+","+str(self.hx_orbit[i])+","+ \

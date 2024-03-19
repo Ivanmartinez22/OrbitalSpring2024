@@ -26,7 +26,7 @@
 import sys
 import torch
 import numpy as np
-from stable_baselines3 import TD3, DDPG
+from stable_baselines3 import TD3, DDPG, PPO
 from stable_baselines3.common.noise import NormalActionNoise
 from gym_env import OrekitEnv
 
@@ -48,6 +48,8 @@ def train_model(alg, initial_state, target_state, simulation_date,
       model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01, train_freq=(1, 'episode'))
    elif(alg == "TD3"):
       model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01)
+   elif alg == 'PPO':
+      model = PPO('MlpPolicy', env, device='auto')
    else:
       print("Unknown model, check again and run")
       sys.exit()

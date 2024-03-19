@@ -39,5 +39,5 @@ spacecraft_mass = [500.0, 150.0]
 # Let Spacecraft take an action every (step) amount of seconds
 simulation_stepT = 500.0
 
-train_model("DDPG", initial_state, target_state, simulation_date, 
+train_model("PPO", initial_state, target_state, simulation_date, 
             simulation_duration, spacecraft_mass, simulation_stepT)
