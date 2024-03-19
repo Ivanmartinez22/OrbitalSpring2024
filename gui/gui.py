@@ -6,7 +6,7 @@ from pathlib import Path
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
-from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
+from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage, Label
 
 
 OUTPUT_PATH = Path(__file__).parent
@@ -21,6 +21,77 @@ window = Tk()
 
 window.geometry("1182x652")
 window.configure(bg = "#1A1E20")
+
+
+
+# Saved Data is in format:
+'''
+data_set_#
+coordinates
+intial, a, e, i, omega, w, v
+final, a, e, i, omega, w, v
+duration, max_thrust, max_speed
+date_1, date_2, date_3, date_4, date_5, date_6
+mass_1, mass_2
+'''
+
+file_path = "saved_data.txt"
+
+def parse_data(file_path):
+    parsed_data = {
+        "data_set_number": None,
+        "coordinate_type": None,
+        "coordinates": {
+            "initial": {},
+            "final": {}
+        },
+        "stats": {
+            "duration": None,
+            "max_thrust": None,
+            "max_speed": None
+        },
+        "date": [],
+        "masses": []
+    }
+
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    print("LINES: ", lines)
+    
+    for i, line in enumerate(lines):
+        parts = line.strip().split(', ')
+        
+        if parts[0] == '1':
+            parsed_data["data_set_number"] = parts[0]
+        elif parts[0] in ['keplerian','cartesian']:
+            parsed_data["coordinate_type"] = line
+        elif parts[0] in ['initial', 'final']:
+            parsed_data["coordinates"][parts[0]] = {
+                "a": eval(parts[1]),
+                "e": float(parts[2]),
+                "i": float(parts[3]),
+                "omega": float(parts[4]),
+                "w": float(parts[5]),
+                "v": float(parts[6])
+            }
+        elif parts[0] == 'results':
+            parsed_data["stats"] = {
+                "duration": eval(parts[1]),
+                "max_thrust": float(parts[2]),
+                "max_speed": float(parts[3])
+            }
+        elif parts[0] == 'date':
+            parsed_data["date"] = [parts[1], parts[2], parts[3], parts[4], parts[5], parts[6]]
+        elif parts[0] == 'mass':
+            parsed_data["masses"] = [parts[1], parts[2]]
+    
+    return parsed_data
+
+parsed_data = parse_data('saved_data.txt')
+print("STATS: ", parsed_data["date"])
+
+
 
 
 canvas = Canvas(
@@ -125,6 +196,7 @@ canvas.create_text(
     font=("Menlo Regular", 20 * -1)
 )
 
+# Entry_1 is DURATION
 entry_image_1 = PhotoImage(
     file=relative_to_assets("entry_1.png"))
 entry_bg_1 = canvas.create_image(
@@ -144,6 +216,7 @@ entry_1.place(
     width=139.0,
     height=32.0
 )
+entry_1.insert("end", str(parsed_data["stats"]["duration"]))
 
 
 canvas.create_text(
@@ -209,6 +282,7 @@ canvas.create_text(
     font=("Menlo Regular", 20 * -1)
 )
 
+# Entry_2 is MAX_THRUST
 entry_image_2 = PhotoImage(
     file=relative_to_assets("entry_2.png"))
 entry_bg_2 = canvas.create_image(
@@ -228,6 +302,7 @@ entry_2.place(
     width=139.0,
     height=32.0
 )
+entry_2.insert("end", "MAX_THRUST")
 
 canvas.create_text(
     182.0,
@@ -238,6 +313,7 @@ canvas.create_text(
     font=("Menlo Regular", 20 * -1)
 )
 
+# Entry_3 is DATE
 entry_image_3 = PhotoImage(
     file=relative_to_assets("entry_3.png"))
 entry_bg_3 = canvas.create_image(
@@ -257,6 +333,7 @@ entry_3.place(
     width=141.0,
     height=32.0
 )
+entry_3.insert("end", parsed_data["date"])
 
 canvas.create_text(
     348.0,
@@ -267,6 +344,7 @@ canvas.create_text(
     font=("Menlo Regular", 20 * -1)
 )
 
+# Entry_4 is MAX_SPEED 
 entry_image_4 = PhotoImage(
     file=relative_to_assets("entry_4.png"))
 entry_bg_4 = canvas.create_image(
@@ -286,6 +364,7 @@ entry_4.place(
     width=139.0,
     height=30.0
 )
+entry_4.insert("end", "MAX_SPEED")
 
 canvas.create_text(
     182.0,
@@ -296,6 +375,7 @@ canvas.create_text(
     font=("Menlo Regular", 20 * -1)
 )
 
+# Entry_5 is MASSES
 entry_image_5 = PhotoImage(
     file=relative_to_assets("entry_5.png"))
 entry_bg_5 = canvas.create_image(
@@ -315,6 +395,7 @@ entry_5.place(
     width=139.0,
     height=30.0
 )
+entry_5.insert("end", parsed_data["masses"])
 
 canvas.create_text(
     19.0,
@@ -325,6 +406,7 @@ canvas.create_text(
     font=("Menlo Regular", 20 * -1)
 )
 
+# Entry_6 is Initial a
 entry_image_6 = PhotoImage(
     file=relative_to_assets("entry_6.png"))
 entry_bg_6 = canvas.create_image(
@@ -344,7 +426,9 @@ entry_6.place(
     width=129.0,
     height=32.0
 )
+entry_6.insert("end", parsed_data["coordinates"]["initial"]['a'])
 
+# Entry_7 is initial i
 entry_image_7 = PhotoImage(
     file=relative_to_assets("entry_7.png"))
 entry_bg_7 = canvas.create_image(
@@ -364,7 +448,9 @@ entry_7.place(
     width=129.0,
     height=31.0
 )
+entry_7.insert("end", parsed_data["coordinates"]["initial"]['i'])
 
+# Entry_8 is Initial w
 entry_image_8 = PhotoImage(
     file=relative_to_assets("entry_8.png"))
 entry_bg_8 = canvas.create_image(
@@ -384,7 +470,10 @@ entry_8.place(
     width=128.0,
     height=28.0
 )
+entry_8.insert("end", parsed_data["coordinates"]["initial"]['w'])
 
+
+# Entry_9 is Initial e
 entry_image_9 = PhotoImage(
     file=relative_to_assets("entry_9.png"))
 entry_bg_9 = canvas.create_image(
@@ -404,7 +493,9 @@ entry_9.place(
     width=129.0,
     height=32.0
 )
+entry_9.insert("end", parsed_data["coordinates"]["initial"]['e'])
 
+# Entry_10 is Initial Omega
 entry_image_10 = PhotoImage(
     file=relative_to_assets("entry_10.png"))
 entry_bg_10 = canvas.create_image(
@@ -424,7 +515,9 @@ entry_10.place(
     width=129.0,
     height=31.0
 )
+entry_10.insert("end", parsed_data["coordinates"]["initial"]['omega'])
 
+# Entry_11 is Initial v
 entry_image_11 = PhotoImage(
     file=relative_to_assets("entry_11.png"))
 entry_bg_11 = canvas.create_image(
@@ -444,6 +537,8 @@ entry_11.place(
     width=129.0,
     height=28.0
 )
+entry_11.insert("end", parsed_data["coordinates"]["initial"]['v'])
+
 
 canvas.create_text(
     3.0,
@@ -508,6 +603,7 @@ canvas.create_text(
     font=("Menlo Regular", 20 * -1)
 )
 
+# Entry_12 is Final a
 entry_image_12 = PhotoImage(
     file=relative_to_assets("entry_12.png"))
 entry_bg_12 = canvas.create_image(
@@ -527,7 +623,9 @@ entry_12.place(
     width=129.0,
     height=32.0
 )
+entry_12.insert("end", parsed_data["coordinates"]["final"]['a'])
 
+# Entry_13 is final i
 entry_image_13 = PhotoImage(
     file=relative_to_assets("entry_13.png"))
 entry_bg_13 = canvas.create_image(
@@ -547,7 +645,9 @@ entry_13.place(
     width=129.0,
     height=31.0
 )
+entry_13.insert("end", parsed_data["coordinates"]["final"]['i'])
 
+# Entry_14 is Final w
 entry_image_14 = PhotoImage(
     file=relative_to_assets("entry_14.png"))
 entry_bg_14 = canvas.create_image(
@@ -567,7 +667,9 @@ entry_14.place(
     width=129.0,
     height=28.0
 )
+entry_14.insert("end", parsed_data["coordinates"]["final"]['w'])
 
+# Entry_15 is Final e
 entry_image_15 = PhotoImage(
     file=relative_to_assets("entry_15.png"))
 entry_bg_15 = canvas.create_image(
@@ -587,8 +689,10 @@ entry_15.place(
     width=130.0,
     height=32.0
 )
+entry_15.insert("end", parsed_data["coordinates"]["final"]['e'])
 
 
+# Entry_16 is Final omega
 entry_image_16 = PhotoImage(
     file=relative_to_assets("entry_16.png"))
 entry_bg_16 = canvas.create_image(
@@ -608,7 +712,9 @@ entry_16.place(
     width=131.0,
     height=31.0
 )
+entry_16.insert("end", parsed_data["coordinates"]["final"]['omega'])
 
+# Entry_17 is final v
 entry_image_17 = PhotoImage(
     file=relative_to_assets("entry_17.png"))
 entry_bg_17 = canvas.create_image(
@@ -628,6 +734,8 @@ entry_17.place(
     width=131.0,
     height=28.0
 )
+entry_17.insert("end", parsed_data["coordinates"]["final"]['v'])
+
 
 canvas.create_text(
     364.0,
