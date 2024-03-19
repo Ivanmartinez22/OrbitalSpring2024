@@ -24,7 +24,7 @@
 # *****************************************************************************
 
 from testing.env_test import checkPackageVersion, testEnvironment
-from training import train_model
+from training import train_model, load_model, predict
 
 testEnvironment()
 
@@ -38,6 +38,11 @@ simulation_duration = 24.0 * 60.0 ** 2 * 4
 spacecraft_mass = [500.0, 150.0]
 # Let Spacecraft take an action every (step) amount of seconds
 simulation_stepT = 500.0
+visualize = True
 
-train_model("PPO", initial_state, target_state, simulation_date, 
-            simulation_duration, spacecraft_mass, simulation_stepT)
+model = load_model('PPO', 'models/97164_PPO_model')
+predict(model, initial_state, target_state, simulation_date, 
+            simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+
+# train_model("PPO", initial_state, target_state, simulation_date, 
+#             simulation_duration, spacecraft_mass, simulation_stepT, visualize)

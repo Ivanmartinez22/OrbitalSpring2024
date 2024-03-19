@@ -32,12 +32,41 @@ from gym_env import OrekitEnv
 
 print('GPU found') if torch.cuda.is_available() else print('GPU not found')
 
+def load_model(alg, model):
+   if alg == 'DDPG':
+      model = DDPG.load(model, device='auto')
+   elif alg == 'TD3':
+      model = TD3.load(model, device='auto')
+   elif alg == 'PPO':
+      model = PPO.load(model, device='auto')
+   else:
+      print('invalid algorithm')
+      return
+   
+   return model
+
+
+def predict(model, initial_state, target_state, simulation_date, 
+                   simulation_duration, spacecraft_mass, simulation_stepT, visualize):
+   env = OrekitEnv(initial_state, target_state, simulation_date, 
+                   simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+   model.set_env(env)
+   state = env.reset()
+   done = False
+   while not done:
+      action, _ = model.predict(state)
+      state, reward, done, info = env.step(action)
+      print(done)
+      print(action)
+   
+   
+
 def train_model(alg, initial_state, target_state, simulation_date, 
-                simulation_duration, spacecraft_mass, simulation_stepT):
+                simulation_duration, spacecraft_mass, simulation_stepT, visualize):
 
    # Create environment instance
    env = OrekitEnv(initial_state, target_state, simulation_date, 
-                   simulation_duration, spacecraft_mass, simulation_stepT, True)
+                   simulation_duration, spacecraft_mass, simulation_stepT, visualize)
    # Get action space from environment
    n_actions = env.action_space.shape[-1]
    # Define the action noise (continuous action space)
