@@ -37,7 +37,7 @@ def train_model(alg, initial_state, target_state, simulation_date,
 
    # Create environment instance
    env = OrekitEnv(initial_state, target_state, simulation_date, 
-                   simulation_duration, spacecraft_mass, simulation_stepT)
+                   simulation_duration, spacecraft_mass, simulation_stepT, True)
    # Get action space from environment
    n_actions = env.action_space.shape[-1]
    # Define the action noise (continuous action space)
