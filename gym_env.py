@@ -455,8 +455,8 @@ class OrekitEnv(gym.Env):
         self.r_initial_state = self.get_state(self.initial_orbit)
         
         #visulizer plot variables 
-        self.fig = plt.figure(figsize=(15, 15))
-        self.ax = self.fig.add_subplot(111, projection='3d')
+        # self.fig = plt.figure(figsize=(15, 15))
+        # self.ax = self.fig.add_subplot(111, projection='3d')
         if self.live_viz is True:
             plt.ion()
 
