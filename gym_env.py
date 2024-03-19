@@ -50,7 +50,9 @@ from org.orekit.orbits import OrbitType, PositionAngleType
 from org.orekit.forces.gravity.potential import GravityFieldFactory
 from org.orekit.forces.gravity import HolmesFeatherstoneAttractionModel
 from org.orekit.utils import IERSConventions, Constants
-from org.orekit.forces.maneuvers import ConstantThrustManeuver
+# from org.orekit.forces.maneuvers import ConstantThrustManeuver
+from org.orekit.forces.maneuvers import ImpulseManeuver
+from org.orekit.propagation.events import DateDetector
 from org.orekit.frames import LOFType
 from org.orekit.attitudes import LofOffset
 from orekit.pyhelpers import setup_orekit_curdir  
@@ -392,6 +394,7 @@ class OrekitEnv(gym.Env):
         #List of actions and thrust magnitudes
         self.actions = []
         self.thrust_mags = []
+        self.n_actions = 0
 
         # Fuel params
         self.dry_mass = mass[0]
@@ -428,11 +431,14 @@ class OrekitEnv(gym.Env):
         self.live_viz = live_viz
 
         # OpenAI API to define 3D continous action space vector [a,b,c]
-        # Force in radial, circumferential, and normal directions
+        # Velocity in the following directions:
+            # radial: line formed from center of earth to satellite, 
+            # tangential: facing in the direction of movement perpendicular to radial
+            # normal: perpendicular to orbit plane
         self.action_space = spaces.Box(
-            low=-0.6,
-            high=0.6,
-            shape=(3,),
+            low=-1,
+            high=1,
+            shape=(4,),
             dtype=np.float32
         )
         # self.observation_space = 10  # states | Equinoctial components + derivatives
@@ -642,6 +648,7 @@ class OrekitEnv(gym.Env):
 
         self.actions = []
         self.thrust_mags = []
+        self.n_actions = 0
 
         state = np.array([self.initial_orbit.getA() / self.r_target_state[0],
                           self.initial_orbit.getEquinoctialEx(),
@@ -683,35 +690,41 @@ class OrekitEnv(gym.Env):
 
     # takes in action and computes state after action is performed
     # returns observation, reward, done, info
-    def step(self, thrust):
+    def step(self, input):
         """
         Take a propagation step
-        :param thrust: 3D Thrust vector (Newtons, float)
+        :param input: 3D velocity vector (m/s, float)
         :return: spacecraft state (np.array), reward value (float), done (bool)
         """
-        thrust_mag = np.linalg.norm(thrust)
-        thrust_dir = thrust / thrust_mag
-        DIRECTION = Vector3D(float(thrust_dir[0]), float(thrust_dir[1]), float(thrust_dir[2]))
-        
-        if thrust_mag <= 0:
-            # DIRECTION = Vector3D.MINUS_J
-            thrust_mag = abs(float(thrust_mag))
-        else:
-            # DIRECTION = Vector3D.PLUS_J
-            thrust_mag = float(thrust_mag)
+        # thrust_mag = np.linalg.norm(thrust)
+        # thrust_dir = thrust / thrust_mag
+        # DIRECTION = Vector3D(float(thrust_dir[0]), float(thrust_dir[1]), float(thrust_dir[2]))
+        # vel = Vector3D(float(vel[0]), float(vel[1]), float(vel[2]))
+
+        # radial, tangential, normal (not sure what order)
+        vel = Vector3D(float(input[0])*100, float(input[1])*100, float(input[2])*100)
+        thrust_bool = input[3] > 0 # model decides if it actually does performs a maneuver
+
+        # Remove previous event detectors
+        self._prop.clearEventsDetectors()
 
         # Add force model
-        thrust_force = ConstantThrustManeuver(self._extrap_Date, self.stepT, thrust_mag, self._isp, attitude, DIRECTION)
-        self._prop.addForceModel(thrust_force)
+        if thrust_bool:
+            event_detector = DateDetector(self._extrap_Date.shiftedBy(0.01)) # detects when date is reached during propagation
+            impulse = ImpulseManeuver(event_detector, attitude, vel, self._isp) # applies velocity vector when event triggered
+            self._prop.addEventDetector(impulse) # add detector to propagator
+            self.n_actions += 1
 
         # Propagate
-        currentState = self._prop.propagate(self._extrap_Date.shiftedBy(self.stepT))
+        currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(self.stepT)))
 
         self.curr_fuel_mass = currentState.getMass() - self.dry_mass
         self._currentDate = currentState.getDate()
         self._extrap_Date = self._currentDate
         self._currentOrbit = currentState.getOrbit()
         coord = currentState.getPVCoordinates().getPosition()
+
+        
 
         # Saving for post analysis
         self.px.append(coord.getX())
@@ -726,14 +739,17 @@ class OrekitEnv(gym.Env):
 
         k_orbit = self.convert_to_keplerian(self._currentOrbit)
 
+        # print(f"Orbit after: {currentState.getA()-EARTH_RADIUS} {k_orbit.getE()} {k_orbit.getI()} {k_orbit.getPerigeeArgument()} {k_orbit.getRightAscensionOfAscendingNode()} {k_orbit.getTrueAnomaly()}")
+
+
         self.e_orbit.append(k_orbit.getE())
         self.i_orbit.append(k_orbit.getI())
         self.w_orbit.append(k_orbit.getPerigeeArgument())
         self.omega_orbit.append(k_orbit.getRightAscensionOfAscendingNode())
         self.v_orbit.append(k_orbit.getTrueAnomaly())
 
-        self.actions.append(thrust)
-        self.thrust_mags.append(thrust_mag)
+        self.actions.append(vel)
+        self.thrust_mags.append(vel)
 
         self.adot_orbit.append(self._currentOrbit.getADot())
         self.exdot_orbit.append(self._currentOrbit.getEquinoctialExDot())
@@ -743,6 +759,10 @@ class OrekitEnv(gym.Env):
 
         # Calc reward / termination state for this step
         reward, done = self.dist_reward() # was self.dist_reward(thrust)
+
+        # penalize doing nothing
+        if done and self.n_actions == 0:
+            reward = -100000000
 
         state_1 = [(self._currentOrbit.getA()) / self.r_target_state[0],
                    self._currentOrbit.getEquinoctialEx(), self._currentOrbit.getEquinoctialEy(),
