@@ -35,6 +35,7 @@ import datetime
 import numpy as np
 import os, random
 import time
+import traceback
 
 orekit.initVM()
 
@@ -304,12 +305,12 @@ MU = Constants.WGS84_EARTH_MU
 
 dir = "results"
 # Check whether the specified path exists or not
-isExist = os.path.exists(dir)
-if not isExist:
-   os.makedirs("results/reward")
-   os.makedirs("results/state")
-   os.makedirs("results/action")
-   os.makedirs("models")
+# isExist = os.path.exists(dir)
+# if not isExist:
+#    os.makedirs("results/reward")
+#    os.makedirs("results/state")
+#    os.makedirs("results/action")
+#    os.makedirs("models")
 
 # Inherit from OpenAI gym
 class OrekitEnv(gym.Env):
@@ -362,6 +363,8 @@ class OrekitEnv(gym.Env):
 
         # state params (used in model) at each time step
         self.a_orbit = [] # semimajor axis
+        
+        self.last_a = state_targ[0]
         self.ex_orbit = [] # eccentricity x
         self.ey_orbit = [] # eccentricity y
         self.hx_orbit = [] # inclination x
@@ -716,26 +719,31 @@ class OrekitEnv(gym.Env):
             self.n_actions += 1
 
         # Propagate
-        currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(self.stepT)))
+        if self.last_a > 0:
+            try:
+                currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(self.stepT)))
+                self.curr_fuel_mass = currentState.getMass() - self.dry_mass
+                self._currentDate = currentState.getDate()
+                self._extrap_Date = self._currentDate
+                self._currentOrbit = currentState.getOrbit()
+                coord = currentState.getPVCoordinates().getPosition()
 
-        self.curr_fuel_mass = currentState.getMass() - self.dry_mass
-        self._currentDate = currentState.getDate()
-        self._extrap_Date = self._currentDate
-        self._currentOrbit = currentState.getOrbit()
-        coord = currentState.getPVCoordinates().getPosition()
+                
 
-        
-
-        # Saving for post analysis
-        self.px.append(coord.getX())
-        self.py.append(coord.getY())
-        self.pz.append(coord.getZ())
-        self.a_orbit.append(currentState.getA())
-        self.ex_orbit.append(currentState.getEquinoctialEx())
-        self.ey_orbit.append(currentState.getEquinoctialEy())
-        self.hx_orbit.append(currentState.getHx())
-        self.hy_orbit.append(currentState.getHy())
-        self.lv_orbit.append(currentState.getLv())
+                # Saving for post analysis
+                self.px.append(coord.getX())
+                self.py.append(coord.getY())
+                self.pz.append(coord.getZ())
+                self.a_orbit.append(currentState.getA())
+                self.ex_orbit.append(currentState.getEquinoctialEx())
+                self.ey_orbit.append(currentState.getEquinoctialEy())
+                self.hx_orbit.append(currentState.getHx())
+                self.hy_orbit.append(currentState.getHy())
+                self.lv_orbit.append(currentState.getLv())
+            except Exception as err:
+                print(err)
+                print("Orbit error a < 0")
+       
 
         k_orbit = self.convert_to_keplerian(self._currentOrbit)
 
@@ -775,6 +783,7 @@ class OrekitEnv(gym.Env):
         info = {}
         
         if self.live_viz is True:
+            self.last_a = self.a_orbit[-1]-EARTH_RADIUS
             update_sat((self.a_orbit[-1]-EARTH_RADIUS),self.e_orbit[-1],degrees(self.i_orbit[-1]),degrees(self.w_orbit[-1]),degrees(self.omega_orbit[-1]),degrees(self.v_orbit[-1]))
 
         return np.array(state_1), reward, done, info
@@ -806,12 +815,64 @@ class OrekitEnv(gym.Env):
            abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] and \
            abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx'] and \
            abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
-            reward += 1
+            reward += 10
             done = True
             print('hit')
             self.target_hit = True
             # Create state file for successful mission
             self.write_state()
+            return reward, done
+        
+        # Give more reward for when individual elements get close to target value 
+        if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a'] or \
+           abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex'] or \
+           abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] or \
+           abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx'] or \
+           abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
+            reward += 1
+            print('hit one of them')
+            # self.target_hit = True
+            # Create state file for successful mission
+            # self.write_state()
+            return reward, done
+        
+        # Give more rewards for multiple matches 
+        if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a'] and \
+           abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex']:
+            reward += 5
+            print('hit multiple of them 1')
+            # self.target_hit = True
+            # Create state file for successful mission
+            # self.write_state()
+            return reward, done
+        
+        if abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex'] and \
+           abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey']:
+            
+            reward += 5
+            print('hit multiple of them 2')
+            # self.target_hit = True
+            # Create state file for successful mission
+            # self.write_state()
+            return reward, done
+
+        if  abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] and \
+            abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx']:
+
+            reward += 5
+            print('hit multiple of them 3')
+            # self.target_hit = True
+            # Create state file for successful mission
+            # self.write_state()
+            return reward, done
+        
+        if abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx'] and \
+           abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
+            reward += 5
+            print('hit multiple of them 4')
+            # self.target_hit = True
+            # Create state file for successful mission
+            # self.write_state()
             return reward, done
 
         # Out of fuel
@@ -852,8 +913,9 @@ class OrekitEnv(gym.Env):
                     f.write(str(self.a_orbit[i]/1e3)+","+str(self.ex_orbit[i])+","+str(self.ey_orbit[i])+","+str(self.hx_orbit[i])+","+ \
                         str(self.hy_orbit[i])+","+str(self.lv_orbit[i])+","+str(self.px[i]/1e3)+","+str(self.py[i]/1e3)+","+str(self.pz[i]/1e3)+'\n')
                 except Exception as err:
+                    print(err)
                     print("Unexpected error")
-                    print("Writing '-' in place")
+                    print("Writing '-' in place 1")
                     f.write('-\n')
         # State file (Kepler)
         with open("results/state/"+str(self.id)+"_"+self.alg+"_state_kepler_"+str(self.episode_num)+".txt", "w") as f:
@@ -864,7 +926,7 @@ class OrekitEnv(gym.Env):
                     f.write(str(self.a_orbit[i]-EARTH_RADIUS)+","+str(self.e_orbit[i])+","+str(degrees(self.i_orbit[i]))+","\
                             +str(degrees(self.w_orbit[i]))+","+str(degrees(self.omega_orbit[i]))+","+str(degrees(self.v_orbit[i]))+'\n')
                 except Exception as err:
-                    print("Unexpected error", err)
+                    print("Unexpected error 2", err)
                     # f.write('-\n')
 
         # Action file
@@ -875,7 +937,8 @@ class OrekitEnv(gym.Env):
                     try:
                         f.write(str(self.actions[i][j])+",")
                     except Exception as err:
-                        print("Unexpected error")
+                        print(err)
+                        print("Unexpected error 3")
                         print("Writing '-' in place")
                         f.write('-\n')
                 f.write(str(self.thrust_mags[i])+'\n')
