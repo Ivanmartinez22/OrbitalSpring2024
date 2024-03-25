@@ -70,13 +70,15 @@ def train_model(alg, initial_state, target_state, simulation_date,
    # Get action space from environment
    n_actions = env.action_space.shape[-1]
    # Define the action noise (continuous action space)
-   action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+   # action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+   action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.3 * np.ones(n_actions))
+
 
    if(alg == "DDPG"):
       # Create the TD3 model
       model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01, train_freq=(1, 'episode'))
    elif(alg == "TD3"):
-      model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01)
+      model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01, policy_delay=5)
    elif alg == 'PPO':
       model = PPO('MlpPolicy', env, device='auto')
    else:
