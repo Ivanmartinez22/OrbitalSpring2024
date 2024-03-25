@@ -365,6 +365,8 @@ class OrekitEnv(gym.Env):
         self.a_orbit = [] # semimajor axis
         
         self.last_a = state_targ[0]
+        self.targ_a = state_targ[0]
+        self.targ_e = state_targ[1]
         self.ex_orbit = [] # eccentricity x
         self.ey_orbit = [] # eccentricity y
         self.hx_orbit = [] # inclination x
@@ -456,6 +458,10 @@ class OrekitEnv(gym.Env):
         # (originally from state and state_targ parameters)
         self.r_target_state = self.get_state(self._targetOrbit)
         self.r_initial_state = self.get_state(self.initial_orbit)
+        
+        
+        self.no_prop_counter = 0
+        self.last_e = self.targ_e
         
         #visulizer plot variables 
         # self.fig = plt.figure(figsize=(15, 15))
@@ -652,6 +658,9 @@ class OrekitEnv(gym.Env):
         self.actions = []
         self.thrust_mags = []
         self.n_actions = 0
+        
+        self.last_a = self.targ_a
+        self.last_e = self.targ_e
 
         state = np.array([self.initial_orbit.getA() / self.r_target_state[0],
                           self.initial_orbit.getEquinoctialEx(),
@@ -719,30 +728,59 @@ class OrekitEnv(gym.Env):
             self.n_actions += 1
 
         # Propagate
-        if self.last_a > 0:
-            try:
-                currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(self.stepT)))
-                self.curr_fuel_mass = currentState.getMass() - self.dry_mass
-                self._currentDate = currentState.getDate()
-                self._extrap_Date = self._currentDate
-                self._currentOrbit = currentState.getOrbit()
-                coord = currentState.getPVCoordinates().getPosition()
+        # if self.last_a > 0:
+        #     try:
+        #         currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(self.stepT)))
+        #         self.curr_fuel_mass = currentState.getMass() - self.dry_mass
+        #         self._currentDate = currentState.getDate()
+        #         self._extrap_Date = self._currentDate
+        #         self._currentOrbit = currentState.getOrbit()
+        #         coord = currentState.getPVCoordinates().getPosition()
 
                 
 
-                # Saving for post analysis
-                self.px.append(coord.getX())
-                self.py.append(coord.getY())
-                self.pz.append(coord.getZ())
-                self.a_orbit.append(currentState.getA())
-                self.ex_orbit.append(currentState.getEquinoctialEx())
-                self.ey_orbit.append(currentState.getEquinoctialEy())
-                self.hx_orbit.append(currentState.getHx())
-                self.hy_orbit.append(currentState.getHy())
-                self.lv_orbit.append(currentState.getLv())
-            except Exception as err:
-                print(err)
-                print("Orbit error a < 0")
+        #         # Saving for post analysis
+        #         self.px.append(coord.getX())
+        #         self.py.append(coord.getY())
+        #         self.pz.append(coord.getZ())
+        #         self.a_orbit.append(currentState.getA())
+        #         self.ex_orbit.append(currentState.getEquinoctialEx())
+        #         self.ey_orbit.append(currentState.getEquinoctialEy())
+        #         self.hx_orbit.append(currentState.getHx())
+        #         self.hy_orbit.append(currentState.getHy())
+        #         self.lv_orbit.append(currentState.getLv())
+        #     except Exception as err:
+        #         reward = -100000000
+        #         print(err)
+        #         print("Orbit error a < 0")
+        if self.last_a > 0 or self.last_e < 1:
+      
+            currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(self.stepT)))
+            self.curr_fuel_mass = currentState.getMass() - self.dry_mass
+            self._currentDate = currentState.getDate()
+            self._extrap_Date = self._currentDate
+            self._currentOrbit = currentState.getOrbit()
+            coord = currentState.getPVCoordinates().getPosition()
+
+            
+
+            # Saving for post analysis
+            self.px.append(coord.getX())
+            self.py.append(coord.getY())
+            self.pz.append(coord.getZ())
+            self.a_orbit.append(currentState.getA())
+            self.ex_orbit.append(currentState.getEquinoctialEx())
+            self.ey_orbit.append(currentState.getEquinoctialEy())
+            self.hx_orbit.append(currentState.getHx())
+            self.hy_orbit.append(currentState.getHy())
+            self.lv_orbit.append(currentState.getLv())
+        else:
+            self.no_prop_counter += 1
+           
+        if self.no_prop_counter >= 1:
+            reward = -100000000
+        print("No prop count: " + str(self.no_prop_counter))
+
        
 
         k_orbit = self.convert_to_keplerian(self._currentOrbit)
@@ -783,8 +821,13 @@ class OrekitEnv(gym.Env):
         info = {}
         
         if self.live_viz is True:
-            self.last_a = self.a_orbit[-1]-EARTH_RADIUS
-            update_sat((self.a_orbit[-1]-EARTH_RADIUS),self.e_orbit[-1],degrees(self.i_orbit[-1]),degrees(self.w_orbit[-1]),degrees(self.omega_orbit[-1]),degrees(self.v_orbit[-1]))
+        
+            print(len(self.a_orbit))
+            if len(self.a_orbit) >= 1:
+                self.last_a = self.a_orbit[-1]-EARTH_RADIUS
+                self.last_e = self.e_orbit[-1]
+                update_sat((self.a_orbit[-1]-EARTH_RADIUS),self.e_orbit[-1],degrees(self.i_orbit[-1]),degrees(self.w_orbit[-1]),degrees(self.omega_orbit[-1]),degrees(self.v_orbit[-1]))
+            
 
         return np.array(state_1), reward, done, info
 
