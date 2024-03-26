@@ -21,9 +21,27 @@ ASSETS_PATH = OUTPUT_PATH / Path(r"assets/frame0")
 def relative_to_assets(path: str) -> Path:
     return ASSETS_PATH / Path(path)
 
-def run_script():
-    subprocess.Popen(["python", "main.py"])
+# Initialize the subprocess variable to None
+process = None
 
+def toggle_script():
+    global process
+    # If there's no process running, start it
+    if process is None:
+        # Update the button to say "Kill Script"
+        button_9.config(image=button_image_kill)
+        # Start the external script and keep its process
+        process = subprocess.Popen(["python","main.py"])
+        button_9['command'] = kill_script
+
+def kill_script():
+    global process
+    # Terminate the process if it exists
+    if process is not None:
+        process.terminate()
+        process = None
+        # Update the button to say "Run Script"
+        button_9.config(image=button_image_9, command=toggle_script)
 
 window = Tk()
 
@@ -882,6 +900,10 @@ button_8.place(
     height=51.66482162475586
 )
 
+# Load iimage for Kill Command
+button_image_kill = PhotoImage(file=relative_to_assets("button_9_kill.png"))  # Your "Kill Script" button image
+
+
 button_image_9 = PhotoImage(
     file=relative_to_assets("button_9.png"))
 button_9 = Button(
@@ -889,7 +911,7 @@ button_9 = Button(
     borderwidth=0,
     highlightthickness=0,
     # command=lambda: print("button_9 clicked"),
-    command=lambda: run_script(),
+    command=lambda: toggle_script(),
     relief="flat"
 )
 button_9.place(
