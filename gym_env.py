@@ -36,6 +36,7 @@ import numpy as np
 import os, random
 import time
 import traceback
+from math import radians, degrees, pi
 
 orekit.initVM()
 
@@ -462,6 +463,8 @@ class OrekitEnv(gym.Env):
         
         self.no_prop_counter = 0
         self.last_e = self.targ_e
+
+        self.one_hit_per_episode = 0
         
         #visulizer plot variables 
         # self.fig = plt.figure(figsize=(15, 15))
@@ -598,6 +601,7 @@ class OrekitEnv(gym.Env):
         # Randomizes the initial orbit (initial state +- random variable)
         if self.randomize:
             self.initial_orbit = None
+            self.one_hit_per_episode = 0
             a_rand = self.seed_state[0]
             e_rand = self.seed_state[1]
             w_rand = self.seed_state[3]
@@ -699,7 +703,9 @@ class OrekitEnv(gym.Env):
                        orbit.getHx(), orbit.getHy(), orbit.getLv()]
 
         return state
+    
 
+    #Ivan Step Function 
     # takes in action and computes state after action is performed
     # returns observation, reward, done, info
     def step(self, input):
@@ -708,13 +714,15 @@ class OrekitEnv(gym.Env):
         :param input: 3D velocity vector (m/s, float)
         :return: spacecraft state (np.array), reward value (float), done (bool)
         """
+
+        self._prevOrbit = self._currentOrbit
         # thrust_mag = np.linalg.norm(thrust)
         # thrust_dir = thrust / thrust_mag
         # DIRECTION = Vector3D(float(thrust_dir[0]), float(thrust_dir[1]), float(thrust_dir[2]))
         # vel = Vector3D(float(vel[0]), float(vel[1]), float(vel[2]))
 
         # radial, tangential, normal (not sure what order)
-        vel = Vector3D(float(input[0])*100, float(input[1])*100, float(input[2])*100)
+        vel = Vector3D(float(input[0])*50, float(input[1])*50, float(input[2])*50)
         thrust_bool = input[3] > 0 # model decides if it actually does performs a maneuver
 
         # Remove previous event detectors
@@ -754,14 +762,19 @@ class OrekitEnv(gym.Env):
         #         print(err)
         #         print("Orbit error a < 0")
         if self.last_a > 0 or self.last_e < 1:
-      
-            currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(self.stepT)))
-            self.curr_fuel_mass = currentState.getMass() - self.dry_mass
-            self._currentDate = currentState.getDate()
-            self._extrap_Date = self._currentDate
-            self._currentOrbit = currentState.getOrbit()
-            coord = currentState.getPVCoordinates().getPosition()
-
+            try:
+                currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(self.stepT)))
+                self.curr_fuel_mass = currentState.getMass() - self.dry_mass
+                self._currentDate = currentState.getDate()
+                self._extrap_Date = self._currentDate
+                self._currentOrbit = currentState.getOrbit()
+                coord = currentState.getPVCoordinates().getPosition()
+            except:
+                print("Orekit error")
+                state = self.get_state(self._currentOrbit, with_derivatives=True)
+                state = np.append(state, self.get_state(self._targetOrbit, with_derivatives=False))[:-1]
+                state = np.append(state, self.n_actions)
+                return state, -1, True, {}
             
 
             # Saving for post analysis
@@ -774,12 +787,10 @@ class OrekitEnv(gym.Env):
             self.hx_orbit.append(currentState.getHx())
             self.hy_orbit.append(currentState.getHy())
             self.lv_orbit.append(currentState.getLv())
-        else:
-            self.no_prop_counter += 1
            
         if self.no_prop_counter >= 1:
             reward = -100000000
-        print("No prop count: " + str(self.no_prop_counter))
+        # print("No prop count: " + str(self.no_prop_counter))
 
        
 
@@ -830,6 +841,13 @@ class OrekitEnv(gym.Env):
             
 
         return np.array(state_1), reward, done, info
+    
+    
+        # compute the difference between 2 angles
+    def angle_diff(self, angle1, angle2):
+        diff = angle2 - angle1
+        diff = (diff + pi) % (2 * pi) - pi
+        return diff
 
 
     def dist_reward(self):
@@ -843,13 +861,57 @@ class OrekitEnv(gym.Env):
 
         state = self.get_state(self._currentOrbit, with_derivatives=False)
 
-        reward_a = np.sqrt((self.r_target_state[0] - state[0])**2) / self.r_target_state[0]
-        reward_ex = np.sqrt((self.r_target_state[1] - state[1])**2)
-        reward_ey = np.sqrt((self.r_target_state[2] - state[2])**2)
-        reward_hx = np.sqrt((self.r_target_state[3] - state[3])**2)
-        reward_hy = np.sqrt((self.r_target_state[4] - state[4])**2)
+        prev_k = self.convert_to_keplerian(self._prevOrbit)
+        curr_k = self.convert_to_keplerian(self._currentOrbit)
+        target_k = self.convert_to_keplerian(self._targetOrbit)
 
-        reward = -(reward_a + reward_hx*10 + reward_hy*10 + reward_ex + reward_ey)
+        prev_dist = np.zeros(5)
+        curr_dist = np.zeros(5)
+
+        prev_dist[0] = (target_k.getA() - prev_k.getA()) / target_k.getA()
+        prev_dist[1] = target_k.getE() - prev_k.getE()
+        prev_dist[2] = self.angle_diff(target_k.getI(), prev_k.getI())
+        prev_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), prev_k.getPerigeeArgument())
+        prev_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), prev_k.getRightAscensionOfAscendingNode())
+        prev_dist_value = np.linalg.norm(prev_dist)
+        # prev_dist_value = np.sum(prev_dist)
+
+        curr_dist[0] = (target_k.getA() - curr_k.getA()) / target_k.getA()
+        curr_dist[1] = target_k.getE() - curr_k.getE()
+        curr_dist[2] = self.angle_diff(target_k.getI(), curr_k.getI())
+        curr_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), curr_k.getPerigeeArgument())
+        curr_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode())
+        curr_dist_value = np.linalg.norm(curr_dist)
+        # curr_dist_value = np.sum(curr_dist)
+
+        # how many actions are we aiming for?
+        # min_actions = 4
+        # max_actions = 10
+        # if self.n_actions < min_actions:
+        #     total_action_penalty = -10 * (min_actions - self.n_actions) ** 3
+        # elif self.n_actions > max_actions:
+        #     total_action_penalty = -5 * (self.n_actions - max_actions)
+        # else:
+        #     total_action_penalty = 0
+
+        # action_penalty = 0.2 if self.did_action else 0 # if did an action subtract value that only rewards above certain threshold of improvement
+        distance_change_reward = (prev_dist_value - curr_dist_value) # reward being closer than the previous
+
+        reward = distance_change_reward - curr_dist_value
+
+        #Original reward calculation 
+        # state = self.get_state(self._currentOrbit, with_derivatives=False)
+
+
+        # reward_a = np.sqrt((self.r_target_state[0] - state[0])**2) / self.r_target_state[0]
+        # reward_ex = np.sqrt((self.r_target_state[1] - state[1])**2)
+        # reward_ey = np.sqrt((self.r_target_state[2] - state[2])**2)
+        # reward_hx = np.sqrt((self.r_target_state[3] - state[3])**2)
+        # reward_hy = np.sqrt((self.r_target_state[4] - state[4])**2)
+
+
+        # reward = -(reward_a + reward_hx*10 + reward_hy*10 + reward_ex + reward_ey)
+
 
         # TERMINAL STATES
         # Target state (with tolerance)
@@ -858,15 +920,15 @@ class OrekitEnv(gym.Env):
            abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] and \
            abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx'] and \
            abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
-            reward += 10
+            reward += 100000
+            self.total_reward += reward
             done = True
             print('hit')
             self.target_hit = True
             # Create state file for successful mission
             self.write_state()
-            return reward, done
-        
-        # Give more reward for when individual elements get close to target value 
+            return reward, done      
+        # Give more reward for when individual elements get close to target value
         if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a'] or \
            abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex'] or \
            abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] or \
@@ -877,71 +939,118 @@ class OrekitEnv(gym.Env):
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
-            return reward, done
-        
-        # Give more rewards for multiple matches 
+            self.one_hit_per_episode += 1
+            self.total_reward += reward
+       
+        # Give more rewards for multiple matches
         if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a'] and \
            abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex']:
-            reward += 5
+            reward += 500
             print('hit multiple of them 1')
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
-            return reward, done
-        
+            self.total_reward += reward
+       
         if abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex'] and \
            abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey']:
-            
-            reward += 5
+           
+            reward += 500
             print('hit multiple of them 2')
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
-            return reward, done
+            self.total_reward += reward
+
+        
+
+
+
 
         if  abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] and \
             abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx']:
 
-            reward += 5
+
+
+
+            reward += 500
             print('hit multiple of them 3')
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
-            return reward, done
-        
+            self.total_reward += reward
+       
         if abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx'] and \
            abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
-            reward += 5
+            reward += 500
             print('hit multiple of them 4')
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
+            self.total_reward += reward
+
+        if state[0] < self.r_target_state[0]:
+            reward -= 100
+            self.total_reward += reward
+            print("Applying penalty for smaller a")
+
+        if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a']:
+            reward += 100
+            self.total_reward += reward
+            print("Applying reward for better a")
+
+        if (1.5 * self.r_target_state[0]) < state[0]:
+            reward -= 100
+            self.total_reward += reward
+            print("Applying penalty for bigger a")
+        
+
+        if (2 * self.r_target_state[0]) < state[0]:
+            reward -= 10000000
+            self.total_reward += reward
+            done = True
+            print("Shot out into space")
             return reward, done
+        
+        if self.one_hit_per_episode >= 10:
+            penalty = self.one_hit_per_episode / 10
+            penalty *= -10
+            self.total_reward += penalty
+            print("Applying penalty for only hitting 1")
+
+
 
         # Out of fuel
         if self.curr_fuel_mass <= 0:
             print('Ran out of fuel')
             done = True
-            reward = -1
+            reward += -10
+            self.total_reward += reward
             return reward, done
+
+
+
 
         # Crash into Earth
         if self._currentOrbit.getA() < EARTH_RADIUS:
-            reward = -1
+            reward += -10000000
             done = True
             print('In earth')
+            self.total_reward += reward
             return reward, done
+
 
         # Mission duration exceeded
         if self._extrap_Date.compareTo(self.final_date) >= 0:
-            reward = -1
+            reward += -1000
             print("Out of time")
             # self.write_state() DEBUG
             done = True
+            return reward, done
 
-        self.total_reward += reward
 
         return reward, done
+
     
 
     # State/Action Output files

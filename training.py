@@ -24,13 +24,13 @@
 # *****************************************************************************
 
 import sys
-import torch
+# import torch
 import numpy as np
 from stable_baselines3 import TD3, DDPG, PPO
 from stable_baselines3.common.noise import NormalActionNoise
 from gym_env import OrekitEnv
 
-print('GPU found') if torch.cuda.is_available() else print('GPU not found')
+# print('GPU found') if torch.cuda.is_available() else print('GPU not found')
 
 def load_model(alg, model):
    if alg == 'DDPG':

@@ -14,8 +14,6 @@
    - Ensure you have the following sytem environment variables in path:
       C:\Program Files\Common Files\Oracle\Java\javapath
       C:\Program Files\Java\jdk-21
-- Luanch Anaconda Navigator
-   - Launch Visual Studio Code from Anaconda this will allow Visual Studio Code Terminal to have access to the Anaconda Environment (I have not been able to get normally launched vscode or powershell to properly access Anaconda yet)
 
 
 
@@ -44,9 +42,6 @@
 - A zip of the trained model will appear in the **models** directory
 - Change **line 39** of **visual_orbit.py** to whatever file within the *results/state* folder you want to visualize
 - Run **visual_orbit.py**
-
-## Execution facts so far 
-- Runs very slow I have not been able to see end of execution 
 
 ## References
 
