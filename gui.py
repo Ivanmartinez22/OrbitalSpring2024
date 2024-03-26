@@ -8,6 +8,11 @@ from pathlib import Path
 # Explicit imports to satisfy Flake8
 from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage, Label
 
+# Import to run when clicking "run"
+# This will be running the Training later
+# The "run" button is Button_9
+import subprocess
+
 
 OUTPUT_PATH = Path(__file__).parent
 ASSETS_PATH = OUTPUT_PATH / Path(r"assets/frame0")
@@ -15,6 +20,9 @@ ASSETS_PATH = OUTPUT_PATH / Path(r"assets/frame0")
 
 def relative_to_assets(path: str) -> Path:
     return ASSETS_PATH / Path(path)
+
+def run_script():
+    subprocess.Popen(["python", "main.py"])
 
 
 window = Tk()
@@ -880,7 +888,8 @@ button_9 = Button(
     image=button_image_9,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print("button_9 clicked"),
+    # command=lambda: print("button_9 clicked"),
+    command=lambda: run_script(),
     relief="flat"
 )
 button_9.place(
