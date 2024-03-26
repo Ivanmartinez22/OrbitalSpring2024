@@ -56,7 +56,6 @@ def predict(model, initial_state, target_state, simulation_date,
    while not done:
       action, _ = model.predict(state)
       state, reward, done, info = env.step(action)
-      print(done)
       print(action)
    
    
