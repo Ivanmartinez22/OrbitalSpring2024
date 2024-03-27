@@ -771,10 +771,18 @@ class OrekitEnv(gym.Env):
                 coord = currentState.getPVCoordinates().getPosition()
             except:
                 print("Orekit error")
-                state = self.get_state(self._currentOrbit, with_derivatives=True)
-                state = np.append(state, self.get_state(self._targetOrbit, with_derivatives=False))[:-1]
-                state = np.append(state, self.n_actions)
-                return state, -1, True, {}
+                # state = self.get_state(self._currentOrbit, with_derivatives=True)
+                # state = np.append(state, self.get_state(self._targetOrbit, with_derivatives=False))[:-1]
+                # state = np.append(state, self.n_actions)
+                state_1 = [(self._currentOrbit.getA()) / self.r_target_state[0],
+                   self._currentOrbit.getEquinoctialEx(), self._currentOrbit.getEquinoctialEy(),
+                   self._currentOrbit.getHx(), self._currentOrbit.getHy(),
+                   self._currentOrbit.getADot(), self._currentOrbit.getEquinoctialExDot(),
+                   self._currentOrbit.getEquinoctialEyDot(),
+                   self._currentOrbit.getHxDot(), self._currentOrbit.getHyDot()
+                   ]
+                
+                return state_1, -1, True, {}
             
 
             # Saving for post analysis
