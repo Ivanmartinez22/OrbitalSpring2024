@@ -436,12 +436,18 @@ class OrekitEnv(gym.Env):
             # radial: line formed from center of earth to satellite, 
             # tangential: facing in the direction of movement perpendicular to radial
             # normal: perpendicular to orbit plane
-        self.action_space = spaces.Box(
-            low=-1,
-            high=1,
-            shape=(3,),
-            dtype=np.float32
-        )
+        # self.action_space = spaces.Box(
+        #     low=-1,
+        #     high=1,
+        #     shape=(3,),
+        #     dtype=np.float32
+        # )
+
+        # new discrete action space
+        self.thrust_values = [-100, -75, -50, -25, 0, 25, 50, 75, 100]
+        self.action_space = spaces.MultiDiscrete([len(self.thrust_values)] * 3)
+
+
         # self.observation_space = 10  # states | Equinoctial components + derivatives
         #   changing to 18: 6 for current equinoctial components, 6 for current derivatives, 5 for target equinoctial components (minus lv), 1 for n_actions
         # OpenAI API
@@ -593,6 +599,7 @@ class OrekitEnv(gym.Env):
         self._currentDate = None
         self._currentOrbit = None
 
+        self.n_actions = 0
         self.consecutive_actions = 0
 
         # Randomizes the initial orbit (initial state +- random variable)
@@ -623,7 +630,7 @@ class OrekitEnv(gym.Env):
         self._extrap_Date = self._initial_date
 
         # reset spacecraft state
-        self.set_spacecraft(self.initial_mass, self.fuel_mass)
+        self.set_spacecraft(self.dry_mass + self.fuel_mass, self.fuel_mass)
         self.curr_fuel_mass = self.fuel_mass
 
         # create propagator and force model
@@ -726,15 +733,7 @@ class OrekitEnv(gym.Env):
         self._prevOrbit = self._currentOrbit
         self.prev_fuel = self.curr_fuel_mass
 
-        # radial, tangential, normal (not sure what order)
-        # input is between -1 and 1, this function allows for ouputs in range -100 to 100 with a 50% chance of picking 0
-        def compute_thrust_val(x):
-            if x < -0.5:
-                return float(100/0.5 * x + 100)
-            if x > 0.5:
-                return float(100/0.5 * x - 100)
-            return float(0.0)
-        
+        compute_thrust_val = lambda x: float(self.thrust_values[x])
         input = list(map(compute_thrust_val, input))
         vel = Vector3D(*input)
 
@@ -754,6 +753,7 @@ class OrekitEnv(gym.Env):
         # Propagate
         try:
             currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(5000)))
+            self.n_actions += 1
         except: 
             print('orekit error')
             # state_1 = [(self._currentOrbit.getA()) / self.r_target_state[0],
@@ -871,6 +871,13 @@ class OrekitEnv(gym.Env):
         curr_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode())
         curr_dist_value = np.linalg.norm(curr_dist)
 
+        curr_dist[0] = abs(self.r_target_state[0] - state[0]) / self.r_target_state[0]
+        curr_dist[1] = abs(self.r_target_state[1] - state[1]) / self.r_target_state[1]
+        curr_dist[2] = abs(self.r_target_state[2] - state[2]) / self.r_target_state[2]
+        curr_dist[3] = abs(self.r_target_state[3] - state[3]) / self.r_target_state[3]
+        curr_dist[4] = abs(self.r_target_state[4] - state[4]) / self.r_target_state[4]
+        curr_dist_value = np.sum(curr_dist)
+
         distance_change = prev_dist_value - curr_dist_value # positive = closer than previous
 
         # penalize having lower altitude than both the target and initial state (hopefully will discourage crashing into)
@@ -885,7 +892,8 @@ class OrekitEnv(gym.Env):
         total_fuel_consumed = self.fuel_mass - self.curr_fuel_mass
         consecutive_action_penalty = self.consecutive_actions * -10 if self.consecutive_actions > 5 else 0
 
-        reward = -1 * 10*curr_dist_value + 5*distance_change - 0.1*fuel_consumed - a_penalty**2 + consecutive_action_penalty
+        # reward = -1 * 10*curr_dist_value + 5*distance_change - 0.1*fuel_consumed - a_penalty**2 + consecutive_action_penalty
+        reward = -curr_dist_value - fuel_consumed
 
         if self.episode_num % 100 == 0:
             print('\naction:', action)
@@ -918,7 +926,7 @@ class OrekitEnv(gym.Env):
            abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx'] and \
            abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
             reward = 1000 # multiply by % fuel left
-            self.fuel_mass = self.curr_fuel_mass # set max fuel usage to current fuel
+            self.fuel_mass = total_fuel_consumed * 1.5 # set max fuel usage to current fuel
             done = True
             print('\nhit')
             self.target_hit = True
@@ -947,6 +955,9 @@ class OrekitEnv(gym.Env):
             print("\nOut of time")
             print('Distance:', curr_dist_value)
             reward = -total_fuel_consumed
+            if self.n_actions == 0:
+                reward = -10000000
+            self.total_reward += reward
             done = True
             return reward, done
 
@@ -962,7 +973,8 @@ class OrekitEnv(gym.Env):
         with open("results/state/"+str(self.id)+"_"+self.alg+"_state_equinoctial_"+str(self.episode_num)+".txt", "w") as f:
             #Add episode number line 1
             f.write("Episode: " + str(self.episode_num) + '\n')
-            f.write('Fuel: ' + str(self.curr_fuel_mass) + '\n')
+            f.write('Fuel: ' + str(self.curr_fuel_mass)  + '/' + str(self.fuel_mass) + '\n')
+            f.write('fuel consumed: ' + str(self.fuel_mass - self.curr_fuel_mass))
             f.write('Distance: ' + str(distance)+ '\n')
             f.write('Total Reward: ' + str(self.total_reward)+ '\n')
             f.write('Number of Steps: ' + str(len(self.actions)) + '\n')
