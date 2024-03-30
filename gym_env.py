@@ -396,6 +396,7 @@ class OrekitEnv(gym.Env):
         self.thrust_mags = []
         self.n_actions = 0
         self.consecutive_actions = 0
+        self.curr_dist = 0
 
         # Fuel params
         self.dry_mass = mass[0]
@@ -588,6 +589,8 @@ class OrekitEnv(gym.Env):
         print('Total Reward:', self.total_reward)
         print(f'Fuel Remaining: {self.curr_fuel_mass}/{self.fuel_mass}')
         print('Actions:', len(self.actions))
+
+        self.write_episode_stats()
 
         self._prop = None
         self._currentDate = None
@@ -871,6 +874,8 @@ class OrekitEnv(gym.Env):
         curr_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode())
         curr_dist_value = np.linalg.norm(curr_dist)
 
+        self.curr_dist = curr_dist_value
+
         distance_change = prev_dist_value - curr_dist_value # positive = closer than previous
 
         # penalize having lower altitude than both the target and initial state (hopefully will discourage crashing into)
@@ -1004,3 +1009,8 @@ class OrekitEnv(gym.Env):
         with open("results/reward/"+str(self.id)+"_"+self.alg+"_reward"+".txt", "w") as f:
             for reward in self.episode_reward:
                 f.write(str(reward)+'\n')
+
+
+    def write_episode_stats(self):
+        with open('results/episode_stats/' + str(self.id) + "_" + self.alg + ".csv", "a") as f:
+            f.write(str(self.episode_num) + ',' + str(self.total_reward) + ',' + str(self.curr_fuel_mass) + ',' + str(self.curr_dist) + '\n')
