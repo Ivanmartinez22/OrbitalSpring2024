@@ -396,6 +396,7 @@ class OrekitEnv(gym.Env):
         self.thrust_mags = []
         self.n_actions = 0
         self.consecutive_actions = 0
+        self.curr_dist = 0
 
         # Fuel params
         self.dry_mass = mass[0]
@@ -595,6 +596,8 @@ class OrekitEnv(gym.Env):
         print(f'Fuel Remaining: {self.curr_fuel_mass}/{self.fuel_mass}')
         print('Actions:', len(self.actions))
 
+        self.write_episode_stats()
+
         self._prop = None
         self._currentDate = None
         self._currentOrbit = None
@@ -742,6 +745,9 @@ class OrekitEnv(gym.Env):
         else:
             self.consecutive_actions = 0
 
+        if(any(input)):
+            self.n_actions += 1
+
         # Remove previous event detectors
         self._prop.clearEventsDetectors()
 
@@ -753,7 +759,6 @@ class OrekitEnv(gym.Env):
         # Propagate
         try:
             currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(5000)))
-            self.n_actions += 1
         except: 
             print('orekit error')
             # state_1 = [(self._currentOrbit.getA()) / self.r_target_state[0],
@@ -878,6 +883,8 @@ class OrekitEnv(gym.Env):
         curr_dist[4] = abs(self.r_target_state[4] - state[4]) / self.r_target_state[4]
         curr_dist_value = np.sum(curr_dist)
 
+        self.curr_dist = curr_dist_value
+
         distance_change = prev_dist_value - curr_dist_value # positive = closer than previous
 
         # penalize having lower altitude than both the target and initial state (hopefully will discourage crashing into)
@@ -893,7 +900,7 @@ class OrekitEnv(gym.Env):
         consecutive_action_penalty = self.consecutive_actions * -10 if self.consecutive_actions > 5 else 0
 
         # reward = -1 * 10*curr_dist_value + 5*distance_change - 0.1*fuel_consumed - a_penalty**2 + consecutive_action_penalty
-        reward = -curr_dist_value - fuel_consumed
+        reward = -curr_dist_value - 0.1*fuel_consumed
 
         if self.episode_num % 100 == 0:
             print('\naction:', action)
@@ -926,7 +933,7 @@ class OrekitEnv(gym.Env):
            abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx'] and \
            abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
             reward = 1000 # multiply by % fuel left
-            self.fuel_mass = total_fuel_consumed * 1.5 # set max fuel usage to current fuel
+            # self.fuel_mass = total_fuel_consumed * 1.5 # set max fuel usage to current fuel
             done = True
             print('\nhit')
             self.target_hit = True
@@ -1016,3 +1023,8 @@ class OrekitEnv(gym.Env):
         with open("results/reward/"+str(self.id)+"_"+self.alg+"_reward"+".txt", "w") as f:
             for reward in self.episode_reward:
                 f.write(str(reward)+'\n')
+
+
+    def write_episode_stats(self):
+        with open('results/episode_stats/' + str(self.id) + "_" + self.alg + ".csv", "a") as f:
+            f.write(str(self.episode_num) + ',' + str(self.total_reward) + ',' + str(self.curr_fuel_mass) + ',' + str(self.curr_dist) + '\n')
