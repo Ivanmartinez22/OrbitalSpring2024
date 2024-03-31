@@ -876,6 +876,125 @@ class OrekitEnv(gym.Env):
         curr_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode())
         curr_dist_value = np.linalg.norm(curr_dist)
 
+        self.curr_dist = curr_dist_value
+
+        distance_change = prev_dist_value - curr_dist_value # positive = closer than previous
+
+        # penalize having lower altitude than both the target and initial state (hopefully will discourage crashing into)
+        a_penalty = curr_k.getA() - min(start_k.getA(), target_k.getA()) # positive = A is further away from minimum
+        a_penalty = 0 if a_penalty > 0 else a_penalty / 100000
+
+        # if a_penalty != 0:
+        #     print(f'curr: {curr_k.getA()}\ttarget: {target_k.getA()}\tinitial: {start_k.getA()}')
+        #     print(f'penalty: {a_penalty}')
+
+        fuel_consumed = self.prev_fuel - self.curr_fuel_mass
+        total_fuel_consumed = self.fuel_mass - self.curr_fuel_mass
+        consecutive_action_penalty = self.consecutive_actions * -10 if self.consecutive_actions > 5 else 0
+
+        reward = -1 * 10*curr_dist_value + 5*distance_change - a_penalty**2
+
+        if self.episode_num % 100 == 0:
+            print('\naction:', action)
+            print(f'dist: {curr_dist_value} \t change: {distance_change} \t fuel: {fuel_consumed} \t a penalty: {a_penalty}')
+            print('reward:', reward)
+
+        # print(distance_change_reward)
+        # print(curr_dist_value)
+
+        # reward_a = np.sqrt((self.r_target_state[0] - state[0])**2) / self.r_target_state[0]
+        # reward_ex = np.sqrt((self.r_target_state[1] - state[1])**2)
+        # reward_ey = np.sqrt((self.r_target_state[2] - state[2])**2)
+        # reward_hx = np.sqrt((self.r_target_state[3] - state[3])**2)
+        # reward_hy = np.sqrt((self.r_target_state[4] - state[4])**2)
+
+        # reward_a2 = np.sqrt((self.r_initial_state[0] - state[0])**2) / self.r_initial_state[0]
+        # reward_ex2 = np.sqrt((self.r_initial_state[1] - state[1])**2)
+        # reward_ey2 = np.sqrt((self.r_initial_state[2] - state[2])**2)
+        # reward_hx2 = np.sqrt((self.r_initial_state[3] - state[3])**2)
+        # reward_hy2 = np.sqrt((self.r_initial_state[4] - state[4])**2)
+
+        # reward = -(reward_a + reward_hx*10 + reward_hy*10 + reward_ex + reward_ey) * self.n_actions
+        # print(reward)
+
+        # TERMINAL STATES
+        # Target state (with tolerance)
+        if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a'] and \
+           abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex'] and \
+           abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] and \
+           abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx'] and \
+           abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
+            reward = 1000 # multiply by % fuel left
+            self.fuel_mass = self.curr_fuel_mass # set max fuel usage to current fuel
+            done = True
+            print('\nhit')
+            self.target_hit = True
+            # Create state file for successful mission
+            self.write_state(curr_dist_value)
+            return reward, done
+
+        # Out of fuel
+        if self.curr_fuel_mass <= 0:
+            print('\nRan out of fuel')
+            print('Distance:', curr_dist_value)
+            reward = -total_fuel_consumed
+            done = True
+            return reward, done
+
+        # Crash into Earth
+        if self._currentOrbit.getA() < EARTH_RADIUS:
+            print('\nIn earth')
+            print('Distance:', curr_dist_value)
+            reward = -total_fuel_consumed
+            done = True
+            return reward, done
+
+        # Mission duration exceeded
+        if self._extrap_Date.compareTo(self.final_date) >= 0:
+            print("\nOut of time")
+            print('Distance:', curr_dist_value)
+            reward = -total_fuel_consumed
+            done = True
+            return reward, done
+
+        self.total_reward += reward
+
+        return reward, done
+
+
+    def dist_reward_2(self, action):
+        """
+        Computes the reward based on the state of the agent
+        :return: reward value (float), done state (bool)
+        """
+        # a, ecc, i, w, omega, E, adot, edot, idot, wdot, omegadot, Edot = state
+
+        done = False
+
+        state = self.get_state(self._currentOrbit, with_derivatives=False)
+
+        prev_k = self.convert_to_keplerian(self._prevOrbit)
+        curr_k = self.convert_to_keplerian(self._currentOrbit)
+        start_k = self.convert_to_keplerian(self.initial_orbit)
+        target_k = self.convert_to_keplerian(self._targetOrbit)
+
+        curr_dist = np.zeros(5)
+        prev_dist = np.zeros(5)
+
+        prev_dist[0] = (target_k.getA() - prev_k.getA()) / target_k.getA()
+        prev_dist[1] = target_k.getE() - prev_k.getE()
+        prev_dist[2] = self.angle_diff(target_k.getI(), prev_k.getI())
+        prev_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), prev_k.getPerigeeArgument())
+        prev_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), prev_k.getRightAscensionOfAscendingNode())
+        prev_dist_value = np.linalg.norm(prev_dist)
+
+        curr_dist[0] = (target_k.getA() - curr_k.getA()) / target_k.getA()
+        curr_dist[1] = target_k.getE() - curr_k.getE()
+        curr_dist[2] = self.angle_diff(target_k.getI(), curr_k.getI())
+        curr_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), curr_k.getPerigeeArgument())
+        curr_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode())
+        curr_dist_value = np.linalg.norm(curr_dist)
+
         curr_dist[0] = abs(self.r_target_state[0] - state[0]) / self.r_target_state[0]
         curr_dist[1] = abs(self.r_target_state[1] - state[1]) / self.r_target_state[1]
         curr_dist[2] = abs(self.r_target_state[2] - state[2]) / self.r_target_state[2]
@@ -900,7 +1019,7 @@ class OrekitEnv(gym.Env):
         consecutive_action_penalty = self.consecutive_actions * -10 if self.consecutive_actions > 5 else 0
 
         # reward = -1 * 10*curr_dist_value + 5*distance_change - 0.1*fuel_consumed - a_penalty**2 + consecutive_action_penalty
-        reward = -curr_dist_value - 0.1*fuel_consumed
+        reward = -curr_dist_value
 
         if self.episode_num % 100 == 0:
             print('\naction:', action)
