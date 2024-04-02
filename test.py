@@ -11,14 +11,15 @@ import matplotlib.pyplot as plt
 # timestep = 53*60+44
 # env = OrekitEnv(initial_state, target_state, simulation_date, simulation_duration, spacecraft_mass, timestep)
 
-data = pd.read_csv('results/episode_stats/discrete_new_no_fuel_90842.csv')
+data = pd.read_csv('results/episode_stats/distance_only_discrete_4964.csv')
 # data = pd.read_csv('results/episode_stats/distance_only_discrete_4964.csv')
+data = data[data.iloc[:,1] > -100000]
 episode = data.iloc[:,0]
 reward = data.iloc[:,1]
 fuel = data.iloc[:,2]
 distance = data.iloc[:,3]
-n_hits = (distance < 0.15).astype(int).sum()
-print(n_hits)
+# n_hits = (distance < 0.15).astype(int).sum()
+# print(n_hits)
 plt.figure(figsize=(8, 6))  # Optional: Adjust the figure size
 plt.plot(episode, reward)
 plt.title('reward')
