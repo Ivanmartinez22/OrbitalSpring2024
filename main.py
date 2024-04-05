@@ -28,6 +28,10 @@ from training import train_model, load_model, predict
 
 testEnvironment()
 
+import time
+start_time = time.time()
+
+
 # Page 35 RP(A Reinforcement Learning Approach to Spacecraft Trajectory);
 # [a(m), e, i(deg), omega/w(deg), Omega/raan(deg), TrueAnomaly(v)]
 initial_state = [5500*1e3, 0.20,5.0, 20.0, 20.0, 10.0]
@@ -45,9 +49,12 @@ if user_viz_in == "y":
     visualize = True
 
 if user_train_predict_in == "1":
-    model = load_model('PPO', 'models/97164_PPO_model')
+    model = load_model('TD3', 'models/76726_TD3_model')
     predict(model, initial_state, target_state, simulation_date, 
                 simulation_duration, spacecraft_mass, simulation_stepT, visualize)
 else:
     train_model("TD3", initial_state, target_state, simulation_date, 
                 simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+    
+    
+print("--- %s seconds ---" % (time.time() - start_time))

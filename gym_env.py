@@ -306,12 +306,12 @@ MU = Constants.WGS84_EARTH_MU
 
 dir = "results"
 # Check whether the specified path exists or not
-# isExist = os.path.exists(dir)
-# if not isExist:
-#    os.makedirs("results/reward")
-#    os.makedirs("results/state")
-#    os.makedirs("results/action")
-#    os.makedirs("models")
+isExist = os.path.exists(dir)
+if not isExist:
+   os.makedirs("results/reward")
+   os.makedirs("results/state")
+   os.makedirs("results/action")
+   os.makedirs("models")
 
 # Inherit from OpenAI gym
 class OrekitEnv(gym.Env):
