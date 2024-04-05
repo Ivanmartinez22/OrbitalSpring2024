@@ -593,6 +593,7 @@ class OrekitEnv(gym.Env):
         Resets the orekit enviornment
         :return:
         """
+        self.write_episode_stats()
 
         self._prop = None
         self._currentDate = None
@@ -1108,3 +1109,7 @@ class OrekitEnv(gym.Env):
         with open("results/reward/"+str(self.id)+"_"+self.alg+"_reward"+".txt", "w") as f:
             for reward in self.episode_reward:
                 f.write(str(reward)+'\n')
+                
+    def write_episode_stats(self):
+        with open('results/episode_stats/' + str(self.id) + "_" + self.alg + ".csv", "a") as f:
+            f.write(str(self.episode_num) + ',' + str(self.total_reward) + ',' + str(self.curr_fuel_mass) + ',' + str(self.curr_dist) + '\n')
