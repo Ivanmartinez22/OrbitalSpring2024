@@ -71,7 +71,7 @@ def train_model(alg, initial_state, target_state, simulation_date,
    # Define the action noise (continuous action space)
    # action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.3 * np.ones(n_actions))
-
+   policy_kwargs = dict(net_arch=[256, 256])
 
    if(alg == "DDPG"):
       # Create the TD3 model
