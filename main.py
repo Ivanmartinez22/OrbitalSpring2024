@@ -40,7 +40,6 @@ spacecraft_mass = [500.0, 150.0]
 simulation_stepT = 500.0
 visualize = False
 
-# model = load_model('PPO', 'models/33507_PPO_model')
 # predict(model, initial_state, target_state, simulation_date, 
 #             simulation_duration, spacecraft_mass, simulation_stepT, visualize)
 

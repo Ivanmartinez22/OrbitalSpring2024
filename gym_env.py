@@ -396,6 +396,7 @@ class OrekitEnv(gym.Env):
         self.thrust_mags = []
         self.n_actions = 0
         self.consecutive_actions = 0
+        self.curr_dist = 0
 
         # Fuel params
         self.dry_mass = mass[0]
@@ -595,6 +596,8 @@ class OrekitEnv(gym.Env):
         print(f'Fuel Remaining: {self.curr_fuel_mass}/{self.fuel_mass}')
         print('Actions:', len(self.actions))
 
+        self.write_episode_stats()
+
         self._prop = None
         self._currentDate = None
         self._currentOrbit = None
@@ -738,6 +741,9 @@ class OrekitEnv(gym.Env):
         else:
             self.consecutive_actions = 0
 
+        if(any(input)):
+            self.n_actions += 1
+
         # Remove previous event detectors
         self._prop.clearEventsDetectors()
 
@@ -825,36 +831,6 @@ class OrekitEnv(gym.Env):
 
         curr_dist = np.zeros(5)
         prev_dist = np.zeros(5)
-
-        # prev_dist[0] = (target_k.getA() - prev_k.getA()) / target_k.getA()
-        # prev_dist[1] = target_k.getE() - prev_k.getE()
-        # prev_dist[2] = self.angle_diff(target_k.getI(), prev_k.getI())
-        # prev_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), prev_k.getPerigeeArgument())
-        # prev_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), prev_k.getRightAscensionOfAscendingNode())
-        # prev_dist_value = np.linalg.norm(prev_dist)
-
-        # curr_dist[0] = (target_k.getA() - curr_k.getA()) / target_k.getA()
-        # curr_dist[1] = target_k.getE() - curr_k.getE()
-        # curr_dist[2] = self.angle_diff(target_k.getI(), curr_k.getI())
-        # curr_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), curr_k.getPerigeeArgument())
-        # curr_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode())
-        # curr_dist_value = np.linalg.norm(curr_dist)
-
-
-        # distance is sum of percent differences from target
-        curr_dist[0] = abs(self.r_target_state[0] - curr_state[0]) / self.r_target_state[0]
-        curr_dist[1] = abs(self.r_target_state[1] - curr_state[1]) / self.r_target_state[1]
-        curr_dist[2] = abs(self.r_target_state[2] - curr_state[2]) / self.r_target_state[2]
-        curr_dist[3] = abs(self.r_target_state[3] - curr_state[3]) / self.r_target_state[3]
-        curr_dist[4] = abs(self.r_target_state[4] - curr_state[4]) / self.r_target_state[4]
-        curr_dist_value = np.sum(curr_dist)
-
-        prev_dist[0] = abs(self.r_target_state[0] - prev_state[0]) / self.r_target_state[0]
-        prev_dist[1] = abs(self.r_target_state[1] - prev_state[1]) / self.r_target_state[1]
-        prev_dist[2] = abs(self.r_target_state[2] - prev_state[2]) / self.r_target_state[2]
-        prev_dist[3] = abs(self.r_target_state[3] - prev_state[3]) / self.r_target_state[3]
-        prev_dist[4] = abs(self.r_target_state[4] - prev_state[4]) / self.r_target_state[4]
-        prev_dist_value = np.sum(prev_dist)
 
         curr_velocity_mag = np.linalg.norm(curr_velocity)
         curr_velocity_mag = 1 if curr_velocity_mag < 1 else curr_velocity_mag # only scale if velocity mag >= 1
@@ -995,3 +971,8 @@ class OrekitEnv(gym.Env):
         with open("results/reward/"+str(self.id)+"_"+self.alg+"_reward"+".txt", "w") as f:
             for reward in self.episode_reward:
                 f.write(str(reward)+'\n')
+
+
+    def write_episode_stats(self):
+        with open('results/episode_stats/' + str(self.id) + "_" + self.alg + ".csv", "a") as f:
+            f.write(str(self.episode_num) + ',' + str(self.total_reward) + ',' + str(self.curr_fuel_mass) + ',' + str(self.curr_dist) + '\n')
