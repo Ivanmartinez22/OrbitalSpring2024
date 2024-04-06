@@ -1024,6 +1024,14 @@ class OrekitEnv(gym.Env):
             print('hit ey hy')
             # Create state file for successful mission
             return reward, done
+        
+        if abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy'] and \
+           abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx']:
+            reward += 100000
+            self.total_reward += reward
+            print('hit hy hx')
+            # Create state file for successful mission
+            return reward, done
                 
         # Major axis critique 
         if state[0] < self.r_target_state[0]:

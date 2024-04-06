@@ -49,7 +49,7 @@ if user_viz_in == "y":
     visualize = True
 
 if user_train_predict_in == "1":
-    model = load_model('PPO', 'models/91285_PPO_model')
+    model = load_model('PPO', 'models/52977_PPO_model')
     predict(model, initial_state, target_state, simulation_date, 
                 simulation_duration, spacecraft_mass, simulation_stepT, visualize)
 else:
