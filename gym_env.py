@@ -397,6 +397,7 @@ class OrekitEnv(gym.Env):
         self.n_actions = 0
         self.consecutive_actions = 0
         self.curr_dist = 0
+        self.n_hits = 0
 
         # Fuel params
         self.dry_mass = mass[0]
@@ -832,6 +833,21 @@ class OrekitEnv(gym.Env):
         curr_dist = np.zeros(5)
         prev_dist = np.zeros(5)
 
+        curr_dist[0] = abs(self.r_target_state[0] - curr_state[0]) / self.r_target_state[0]
+        curr_dist[1] = abs(self.r_target_state[1] - curr_state[1]) / self.r_target_state[1]
+        curr_dist[2] = abs(self.r_target_state[2] - curr_state[2]) / self.r_target_state[2]
+        curr_dist[3] = abs(self.r_target_state[3] - curr_state[3]) / self.r_target_state[3]
+        curr_dist[4] = abs(self.r_target_state[4] - curr_state[4]) / self.r_target_state[4]
+        curr_dist_value = np.sum(curr_dist)
+        self.curr_dist = curr_dist_value
+
+        prev_dist[0] = abs(self.r_target_state[0] - prev_state[0]) / self.r_target_state[0]
+        prev_dist[1] = abs(self.r_target_state[1] - prev_state[1]) / self.r_target_state[1]
+        prev_dist[2] = abs(self.r_target_state[2] - prev_state[2]) / self.r_target_state[2]
+        prev_dist[3] = abs(self.r_target_state[3] - prev_state[3]) / self.r_target_state[3]
+        prev_dist[4] = abs(self.r_target_state[4] - prev_state[4]) / self.r_target_state[4]
+        prev_dist_value = np.sum(prev_dist)
+
         curr_velocity_mag = np.linalg.norm(curr_velocity)
         curr_velocity_mag = 1 if curr_velocity_mag < 1 else curr_velocity_mag # only scale if velocity mag >= 1
 
@@ -839,6 +855,7 @@ class OrekitEnv(gym.Env):
         # scaled by current velocity magnitude so it doesnt get big rewards for going fast
         # might replace with a constant value if its closer
         distance_change = (prev_dist_value - curr_dist_value) / curr_velocity_mag 
+        distance_change_constant = 0.1 if distance_change > 0 else -0.1
 
         # penalize having lower altitude than both the target and initial state (hopefully will discourage crashing into)
         a_penalty = curr_state[0] - 1000+EARTH_RADIUS # positive = A is greater than min altitude (1000)
@@ -851,7 +868,7 @@ class OrekitEnv(gym.Env):
 
         # reward = -1 * 10*curr_dist_value + 5*distance_change - 0.1*fuel_consumed - a_penalty**2 + consecutive_action_penalty
         # reward = -curr_dist_value - fuel_consumed
-        reward = -curr_dist_value + distance_change - a_penalty - action_penalty
+        reward = -curr_dist_value + distance_change_constant - a_penalty - action_penalty
         # print('distance reward:', curr_dist_value)
         # print('distance change:', distance_change)
         # print('a penalty:', a_penalty)
@@ -890,6 +907,7 @@ class OrekitEnv(gym.Env):
                 self.fuel_mass = total_fuel_consumed * 1.5 # set max fuel usage to current fuel
             done = True
             self.target_hit = True
+            self.n_hits += 1
             # Create state file for successful mission
             self.write_state(curr_dist_value)
 
@@ -975,4 +993,4 @@ class OrekitEnv(gym.Env):
 
     def write_episode_stats(self):
         with open('results/episode_stats/' + str(self.id) + "_" + self.alg + ".csv", "a") as f:
-            f.write(str(self.episode_num) + ',' + str(self.total_reward) + ',' + str(self.curr_fuel_mass) + ',' + str(self.curr_dist) + '\n')
+            f.write(str(self.episode_num) + ',' + str(self.total_reward) + ',' + str(self.curr_fuel_mass) + ',' + str(self.curr_dist) + ', ' + str(self.n_hits) + '\n')
