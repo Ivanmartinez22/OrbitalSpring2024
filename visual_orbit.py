@@ -36,7 +36,7 @@ ax_lims = 7000000
 asymtote_limit = 0.99
 
 # Reading in specific Kepler state file
-with open('results/state/28693/28693_TD3_state_kepler_138.txt', 'r') as f:
+with open('results/state/50297_PPO_state_kepler_2135.txt', 'r') as f:
     lines = f.readlines()[1:]
 
 # Capture data

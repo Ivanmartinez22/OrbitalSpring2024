@@ -49,12 +49,12 @@ if user_viz_in == "y":
     visualize = True
 
 if user_train_predict_in == "1":
-    model = load_model('TD3', 'models/76726_TD3_model')
+    model = load_model('PPO', 'models/91285_PPO_model')
     predict(model, initial_state, target_state, simulation_date, 
                 simulation_duration, spacecraft_mass, simulation_stepT, visualize)
 else:
-    train_model("TD3", initial_state, target_state, simulation_date, 
+    train_model("PPO", initial_state, target_state, simulation_date, 
                 simulation_duration, spacecraft_mass, simulation_stepT, visualize)
     
-    
+
 print("--- %s seconds ---" % (time.time() - start_time))
