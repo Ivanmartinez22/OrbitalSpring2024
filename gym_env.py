@@ -421,7 +421,7 @@ class OrekitEnv(gym.Env):
 
         # create orbits (in Keplerian coordinates)
         self.initial_orbit = self.create_orbit(state, self._initial_date)
-        self._currentOrbit = self.create_orbit(state, self._initial_date) # might have to reference same object as _orbit
+        self._currentOrbit = self.create_orbit(state, self._initial_date)
         self._targetOrbit= self.create_orbit(state_targ, self.final_date)
 
         self.set_spacecraft(self.initial_mass, self.curr_fuel_mass) # sets self._sc_state
@@ -457,7 +457,7 @@ class OrekitEnv(gym.Env):
         self.action_bound = 0.6  # Max thrust limit
         self._isp = 3100.0 
 
-        # set self.r_target_state and self.r_initial_state with data from _targetOrbit and _orbit (convert from KeplerianOrbit to np.array)
+        # set self.r_target_state and self.r_initial_state with data from _targetOrbit and _orbit (convert from KeplerianOrbit to np.array of equinoctial components)
         # (originally from state and state_targ parameters)
         self.r_target_state = self.get_state(self._targetOrbit)
         self.r_initial_state = self.get_state(self.initial_orbit)
@@ -621,7 +621,7 @@ class OrekitEnv(gym.Env):
             state = [a_rand, e_rand, i_rand, w_rand, omega_rand, lv_rand]
 
             self.initial_orbit = self.create_orbit(state, self._initial_date)
-            self._currentOrbit = self.create_orbit(state, self._initial_date) # might have to reference same object as _orbit
+            self._currentOrbit = self.create_orbit(state, self._initial_date)
         else:
             self._currentOrbit = self.initial_orbit
 
@@ -665,18 +665,8 @@ class OrekitEnv(gym.Env):
         self.actions = []
         self.thrust_mags = []
 
-        # state = np.array([self.initial_orbit.getA() / self.r_target_state[0],
-        #                   self.initial_orbit.getEquinoctialEx(),
-        #                   self.initial_orbit.getEquinoctialEy(),
-        #                   self.initial_orbit.getHx(),
-        #                   self.initial_orbit.getHy(), 0, 0, 0, 0, 0])
 
-        # curr_state = self.get_state(self._currentOrbit, with_derivatives=False)
-        # curr_state = np.append(curr_state, np.array([0, 0, 0, 0, 0, 0]))
-        # target_state = self.get_state(self._targetOrbit, with_derivatives=False)[:-1]
-        # state = np.append(curr_state, target_state)
-        # state = np.append(state, self.fuel_mass)
-        state = self.get_state_keplerian(self._currentOrbit)
+        state = self.get_state(self._currentOrbit)
 
         if self.total_reward != 0:
             self.episode_reward.append(self.total_reward) 
@@ -695,19 +685,22 @@ class OrekitEnv(gym.Env):
 
 
     # return state as list from orbit object
-    # state using the equinoctial elements
+    # used by the model as input for NN (must match observation space dimensions)
     def get_state(self, orbit, with_derivatives=True):
-
-        if with_derivatives:
-            state = [orbit.getA(), orbit.getEquinoctialEx(), orbit.getEquinoctialEy(),
-                     orbit.getHx(), orbit.getHy(), orbit.getLv(),
-                     orbit.getADot(), orbit.getEquinoctialExDot(),
+        # basic equinoctial components
+        state = [orbit.getA(), orbit.getEquinoctialEx(), orbit.getEquinoctialEy(),
+                       orbit.getHx(), orbit.getHy(), orbit.getLv()] 
+        
+        # add derivatives
+        if with_derivatives: 
+            state += [orbit.getADot(), orbit.getEquinoctialExDot(),
                      orbit.getEquinoctialEyDot(),
                      orbit.getHxDot(), orbit.getHyDot(), orbit.getLvDot()]
-        else:
-            state = [orbit.getA(), orbit.getEquinoctialEx(), orbit.getEquinoctialEy(),
-                       orbit.getHx(), orbit.getHy(), orbit.getLv()]
 
+        # add target and current fuel
+        state += [self._targetOrbit.getA(), self._targetOrbit.getE(), self._targetOrbit.getI(), self._targetOrbit.getPerigeeArgument(), self._targetOrbit.getRightAscensionOfAscendingNode(),
+                 self.curr_fuel_mass]
+        
         return state
     
 
@@ -732,6 +725,7 @@ class OrekitEnv(gym.Env):
         """
         self._prevOrbit = self._currentOrbit
         self.prev_fuel = self.curr_fuel_mass
+        self.did_action = False
 
         compute_thrust_val = lambda x: float(self.thrust_values[x])
         input = list(map(compute_thrust_val, input))
@@ -739,6 +733,8 @@ class OrekitEnv(gym.Env):
 
         if(any(input)):
             self.consecutive_actions += 1
+            self.did_action = True
+            self.n_actions += 1
         else:
             self.consecutive_actions = 0
 
@@ -753,30 +749,20 @@ class OrekitEnv(gym.Env):
         # Propagate
         try:
             currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(5000)))
-            self.n_actions += 1
         except: 
             print('orekit error')
-            # state_1 = [(self._currentOrbit.getA()) / self.r_target_state[0],
-            #        self._currentOrbit.getEquinoctialEx(), self._currentOrbit.getEquinoctialEy(),
-            #        self._currentOrbit.getHx(), self._currentOrbit.getHy(),
-            #        self._currentOrbit.getADot(), self._currentOrbit.getEquinoctialExDot(),
-            #        self._currentOrbit.getEquinoctialEyDot(),
-            #        self._currentOrbit.getHxDot(), self._currentOrbit.getHyDot()
-            #        ]
-            # state = self.get_state(self._currentOrbit, with_derivatives=True)
-            # state = np.append(state, self.get_state(self._targetOrbit, with_derivatives=False))[:-1]
-            # state = np.append(state, self.curr_fuel_mass)
-            state = self.get_state_keplerian(self._currentOrbit)
+            state = self.get_state(self._currentOrbit)
             return state, -1, True, {}
         
 
+        # set current state equal to newly propagated state
         self.curr_fuel_mass = currentState.getMass() - self.dry_mass
         self._currentDate = currentState.getDate()
         self._extrap_Date = self._currentDate
         self._currentOrbit = currentState.getOrbit()
-        coord = currentState.getPVCoordinates().getPosition()
 
         # Saving for post analysis
+        coord = currentState.getPVCoordinates().getPosition()
         self.px.append(coord.getX())
         self.py.append(coord.getY())
         self.pz.append(coord.getZ())
@@ -788,10 +774,6 @@ class OrekitEnv(gym.Env):
         self.lv_orbit.append(currentState.getLv())
 
         k_orbit = self.convert_to_keplerian(self._currentOrbit)
-
-        # print(f"Orbit after: {currentState.getA()-EARTH_RADIUS} {k_orbit.getE()} {k_orbit.getI()} {k_orbit.getPerigeeArgument()} {k_orbit.getRightAscensionOfAscendingNode()} {k_orbit.getTrueAnomaly()}")
-
-
         self.e_orbit.append(k_orbit.getE())
         self.i_orbit.append(k_orbit.getI())
         self.w_orbit.append(k_orbit.getPerigeeArgument())
@@ -808,26 +790,13 @@ class OrekitEnv(gym.Env):
         self.hydot_orbit.append(self._currentOrbit.getHyDot())
 
         # Calc reward / termination state for this step
-        reward, done = self.dist_reward(vel) # was self.dist_reward(thrust)
-
-
-        # state_1 = [(self._currentOrbit.getA()) / self.r_target_state[0],
-        #            self._currentOrbit.getEquinoctialEx(), self._currentOrbit.getEquinoctialEy(),
-        #            self._currentOrbit.getHx(), self._currentOrbit.getHy(),
-        #            self._currentOrbit.getADot(), self._currentOrbit.getEquinoctialExDot(),
-        #            self._currentOrbit.getEquinoctialEyDot(),
-        #            self._currentOrbit.getHxDot(), self._currentOrbit.getHyDot()
-        #            ]
-        
-        # state = self.get_state(self._currentOrbit, with_derivatives=True)
-        # state = np.append(state, self.get_state(self._targetOrbit, with_derivatives=False))[:-1]
-        # state = np.append(state, self.curr_fuel_mass)
-        state = self.get_state_keplerian(self._currentOrbit)
-        # OpenAI debug option
-        info = {}
+        reward, done = self.dist_reward(vel)
+        state = self.get_state(self._currentOrbit)
+        info = {} # OpenAI debug option
         
         if self.live_viz is True:
             update_sat((self.a_orbit[-1]-EARTH_RADIUS),self.e_orbit[-1],degrees(self.i_orbit[-1]),degrees(self.w_orbit[-1]),degrees(self.omega_orbit[-1]),degrees(self.v_orbit[-1]))
+
         return np.array(state), reward, done, info
     
 
@@ -843,62 +812,76 @@ class OrekitEnv(gym.Env):
         Computes the reward based on the state of the agent
         :return: reward value (float), done state (bool)
         """
-        # a, ecc, i, w, omega, E, adot, edot, idot, wdot, omegadot, Edot = state
-
         done = False
 
-        state = self.get_state(self._currentOrbit, with_derivatives=False)
+        curr_state = self.get_state(self._currentOrbit)
+        curr_velocity = curr_state[6:12]
+        prev_state = self.get_state(self._prevOrbit, with_derivatives=False)
 
-        prev_k = self.convert_to_keplerian(self._prevOrbit)
-        curr_k = self.convert_to_keplerian(self._currentOrbit)
-        start_k = self.convert_to_keplerian(self.initial_orbit)
-        target_k = self.convert_to_keplerian(self._targetOrbit)
+        # prev_k = self.convert_to_keplerian(self._prevOrbit)
+        # curr_k = self.convert_to_keplerian(self._currentOrbit)
+        # start_k = self.convert_to_keplerian(self.initial_orbit)
+        # target_k = self.convert_to_keplerian(self._targetOrbit)
 
         curr_dist = np.zeros(5)
         prev_dist = np.zeros(5)
 
-        prev_dist[0] = (target_k.getA() - prev_k.getA()) / target_k.getA()
-        prev_dist[1] = target_k.getE() - prev_k.getE()
-        prev_dist[2] = self.angle_diff(target_k.getI(), prev_k.getI())
-        prev_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), prev_k.getPerigeeArgument())
-        prev_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), prev_k.getRightAscensionOfAscendingNode())
-        prev_dist_value = np.linalg.norm(prev_dist)
+        # prev_dist[0] = (target_k.getA() - prev_k.getA()) / target_k.getA()
+        # prev_dist[1] = target_k.getE() - prev_k.getE()
+        # prev_dist[2] = self.angle_diff(target_k.getI(), prev_k.getI())
+        # prev_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), prev_k.getPerigeeArgument())
+        # prev_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), prev_k.getRightAscensionOfAscendingNode())
+        # prev_dist_value = np.linalg.norm(prev_dist)
 
-        curr_dist[0] = (target_k.getA() - curr_k.getA()) / target_k.getA()
-        curr_dist[1] = target_k.getE() - curr_k.getE()
-        curr_dist[2] = self.angle_diff(target_k.getI(), curr_k.getI())
-        curr_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), curr_k.getPerigeeArgument())
-        curr_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode())
-        curr_dist_value = np.linalg.norm(curr_dist)
+        # curr_dist[0] = (target_k.getA() - curr_k.getA()) / target_k.getA()
+        # curr_dist[1] = target_k.getE() - curr_k.getE()
+        # curr_dist[2] = self.angle_diff(target_k.getI(), curr_k.getI())
+        # curr_dist[3] = self.angle_diff(target_k.getPerigeeArgument(), curr_k.getPerigeeArgument())
+        # curr_dist[4] = self.angle_diff(target_k.getRightAscensionOfAscendingNode(), curr_k.getRightAscensionOfAscendingNode())
+        # curr_dist_value = np.linalg.norm(curr_dist)
 
-        curr_dist[0] = abs(self.r_target_state[0] - state[0]) / self.r_target_state[0]
-        curr_dist[1] = abs(self.r_target_state[1] - state[1]) / self.r_target_state[1]
-        curr_dist[2] = abs(self.r_target_state[2] - state[2]) / self.r_target_state[2]
-        curr_dist[3] = abs(self.r_target_state[3] - state[3]) / self.r_target_state[3]
-        curr_dist[4] = abs(self.r_target_state[4] - state[4]) / self.r_target_state[4]
+
+        # distance is sum of percent differences from target
+        curr_dist[0] = abs(self.r_target_state[0] - curr_state[0]) / self.r_target_state[0]
+        curr_dist[1] = abs(self.r_target_state[1] - curr_state[1]) / self.r_target_state[1]
+        curr_dist[2] = abs(self.r_target_state[2] - curr_state[2]) / self.r_target_state[2]
+        curr_dist[3] = abs(self.r_target_state[3] - curr_state[3]) / self.r_target_state[3]
+        curr_dist[4] = abs(self.r_target_state[4] - curr_state[4]) / self.r_target_state[4]
         curr_dist_value = np.sum(curr_dist)
 
-        distance_change = prev_dist_value - curr_dist_value # positive = closer than previous
+        prev_dist[0] = abs(self.r_target_state[0] - prev_state[0]) / self.r_target_state[0]
+        prev_dist[1] = abs(self.r_target_state[1] - prev_state[1]) / self.r_target_state[1]
+        prev_dist[2] = abs(self.r_target_state[2] - prev_state[2]) / self.r_target_state[2]
+        prev_dist[3] = abs(self.r_target_state[3] - prev_state[3]) / self.r_target_state[3]
+        prev_dist[4] = abs(self.r_target_state[4] - prev_state[4]) / self.r_target_state[4]
+        prev_dist_value = np.sum(prev_dist)
+
+        curr_velocity_mag = np.linalg.norm(curr_velocity)
+        curr_velocity_mag = 1 if curr_velocity_mag < 1 else curr_velocity_mag # only scale if velocity mag >= 1
+
+        # positive = current state closer to target than previous
+        # scaled by current velocity magnitude so it doesnt get big rewards for going fast
+        # might replace with a constant value if its closer
+        distance_change = (prev_dist_value - curr_dist_value) / curr_velocity_mag 
 
         # penalize having lower altitude than both the target and initial state (hopefully will discourage crashing into)
-        a_penalty = curr_k.getA() - min(start_k.getA(), target_k.getA()) # positive = A is further away from minimum
-        a_penalty = 0 if a_penalty > 0 else a_penalty / 100000
-
-        # if a_penalty != 0:
-        #     print(f'curr: {curr_k.getA()}\ttarget: {target_k.getA()}\tinitial: {start_k.getA()}')
-        #     print(f'penalty: {a_penalty}')
+        a_penalty = curr_state[0] - 1000+EARTH_RADIUS # positive = A is greater than min altitude (1000)
+        a_penalty = 0 if a_penalty > 0 else a_penalty * 100
 
         fuel_consumed = self.prev_fuel - self.curr_fuel_mass
         total_fuel_consumed = self.fuel_mass - self.curr_fuel_mass
         consecutive_action_penalty = self.consecutive_actions * -10 if self.consecutive_actions > 5 else 0
+        action_penalty = 0.1 if self.did_action else 0
 
         # reward = -1 * 10*curr_dist_value + 5*distance_change - 0.1*fuel_consumed - a_penalty**2 + consecutive_action_penalty
-        reward = -curr_dist_value - fuel_consumed
+        # reward = -curr_dist_value - fuel_consumed
+        reward = -curr_dist_value + distance_change - a_penalty - action_penalty
+        # print('distance reward:', curr_dist_value)
+        # print('distance change:', distance_change)
+        # print('a penalty:', a_penalty)
+        # print('action penalty:', action_penalty)
 
-        if self.episode_num % 100 == 0:
-            print('\naction:', action)
-            print(f'dist: {curr_dist_value} \t change: {distance_change} \t fuel: {fuel_consumed} \t a penalty: {a_penalty}')
-            print('reward:', reward)
+
 
         # print(distance_change_reward)
         # print(curr_dist_value)
@@ -920,46 +903,42 @@ class OrekitEnv(gym.Env):
 
         # TERMINAL STATES
         # Target state (with tolerance)
-        if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a'] and \
-           abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex'] and \
-           abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] and \
-           abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx'] and \
-           abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
-            reward = 1000 # multiply by % fuel left
-            self.fuel_mass = total_fuel_consumed * 1.5 # set max fuel usage to current fuel
-            done = True
+        if abs(self.r_target_state[0] - curr_state[0]) <= self._orbit_tolerance['a'] and \
+           abs(self.r_target_state[1] - curr_state[1]) <= self._orbit_tolerance['ex'] and \
+           abs(self.r_target_state[2] - curr_state[2]) <= self._orbit_tolerance['ey'] and \
+           abs(self.r_target_state[3] - curr_state[3]) <= self._orbit_tolerance['hx'] and \
+           abs(self.r_target_state[4] - curr_state[4]) <= self._orbit_tolerance['hy']:
             print('\nhit')
+            reward = 100000 # multiply by % fuel left
+            if not self.randomize: # if the initial states are not randomized at each episode (initial states always the same)
+                self.fuel_mass = total_fuel_consumed * 1.5 # set max fuel usage to current fuel
+            done = True
             self.target_hit = True
             # Create state file for successful mission
             self.write_state(curr_dist_value)
-            return reward, done
 
         # Out of fuel
-        if self.curr_fuel_mass <= 0:
+        elif self.curr_fuel_mass <= 0:
             print('\nRan out of fuel')
             print('Distance:', curr_dist_value)
             reward = -total_fuel_consumed
             done = True
-            return reward, done
 
         # Crash into Earth
-        if self._currentOrbit.getA() < EARTH_RADIUS:
+        elif self._currentOrbit.getA() < EARTH_RADIUS:
             print('\nIn earth')
             print('Distance:', curr_dist_value)
             reward = -total_fuel_consumed
             done = True
-            return reward, done
 
         # Mission duration exceeded
-        if self._extrap_Date.compareTo(self.final_date) >= 0:
+        elif self._extrap_Date.compareTo(self.final_date) >= 0:
             print("\nOut of time")
             print('Distance:', curr_dist_value)
             reward = -total_fuel_consumed
-            if self.n_actions == 0:
+            if self.n_actions == 0: # penalize doing nothing
                 reward = -10000000
-            self.total_reward += reward
             done = True
-            return reward, done
 
         self.total_reward += reward
 
