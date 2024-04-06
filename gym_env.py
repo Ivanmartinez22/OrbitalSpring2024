@@ -442,12 +442,12 @@ class OrekitEnv(gym.Env):
             # radial: line formed from center of earth to satellite, 
             # tangential: facing in the direction of movement perpendicular to radial
             # normal: perpendicular to orbit plane
-        self.action_space = spaces.Box(
-            low=-1,
-            high=1,
-            shape=(4,),
-            dtype=np.float32
-        )
+        # self.action_space = spaces.Box(
+        #     low=-1,
+        #     high=1,
+        #     shape=(4,),
+        #     dtype=np.float32
+        # )
         # self.observation_space = 10  # states | Equinoctial components + derivatives
         # OpenAI API
         # state params + derivatives (could include target in future)
@@ -472,6 +472,11 @@ class OrekitEnv(gym.Env):
         # self.ax = self.fig.add_subplot(111, projection='3d')
         if self.live_viz is True:
             plt.ion()
+            
+        # new discrete action space
+        self.thrust_values = [-100, -75, -50, -25, 0, 25, 50, 75, 100]
+        self.action_space = spaces.MultiDiscrete([len(self.thrust_values)] * 3)
+        self.consecutive_actions = 0
 
 
 
@@ -725,18 +730,22 @@ class OrekitEnv(gym.Env):
         # vel = Vector3D(float(vel[0]), float(vel[1]), float(vel[2]))
 
         # radial, tangential, normal (not sure what order)
-        vel = Vector3D(float(input[0])*50, float(input[1])*50, float(input[2])*50)
-        thrust_bool = input[3] > 0 # model decides if it actually does performs a maneuver
+        # vel = Vector3D(float(input[0])*50, float(input[1])*50, float(input[2])*50)
+        # thrust_bool = input[3] > 0 # model decides if it actually does performs a maneuver
+        compute_thrust_val = lambda x: float(self.thrust_values[x])
+        input = list(map(compute_thrust_val, input))
+        vel = Vector3D(*input)
 
+        
         # Remove previous event detectors
         self._prop.clearEventsDetectors()
 
         # Add force model
-        if thrust_bool:
-            event_detector = DateDetector(self._extrap_Date.shiftedBy(0.01)) # detects when date is reached during propagation
-            impulse = ImpulseManeuver(event_detector, attitude, vel, self._isp) # applies velocity vector when event triggered
-            self._prop.addEventDetector(impulse) # add detector to propagator
-            self.n_actions += 1
+        # if thrust_bool:
+        event_detector = DateDetector(self._extrap_Date.shiftedBy(0.01)) # detects when date is reached during propagation
+        impulse = ImpulseManeuver(event_detector, attitude, vel, self._isp) # applies velocity vector when event triggered
+        self._prop.addEventDetector(impulse) # add detector to propagator
+        self.n_actions += 1
 
         # Propagate
         # if self.last_a > 0:
@@ -852,6 +861,8 @@ class OrekitEnv(gym.Env):
             
 
         return np.array(state_1), reward, done, info
+    
+    
     
     
         # compute the difference between 2 angles
