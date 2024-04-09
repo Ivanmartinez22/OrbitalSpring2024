@@ -929,59 +929,67 @@ class OrekitEnv(gym.Env):
         # Give more reward for when individual elements get close to target value
         hit_Number = []
         if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a']:
-            reward += 1
-            print('hit a')
+            #reward += 1
+            #print('hit a')
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
             hit_Number.append("a")
-            self.one_hit_per_episode += 1
-            self.total_reward += reward
+            #self.one_hit_per_episode += 1
+            #self.total_reward += reward
         
         if abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex']:
             reward += 1
-            print('hit ex')
+            # print('hit ex')
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
             hit_Number.append("ex")
-            self.one_hit_per_episode += 1
-            self.total_reward += reward
+            # self.one_hit_per_episode += 1
+            # self.total_reward += reward
             
         if abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey']:
-            reward += 1
-            print('hit ey')
+            # reward += 1
+            # print('hit ey')
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
             hit_Number.append("ey")
-            self.one_hit_per_episode += 1
-            self.total_reward += reward
+            # self.one_hit_per_episode += 1
+            # self.total_reward += reward
         
         if abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx']:
-            reward += 1
-            print('hit hx')
+            # reward += 1
+            # print('hit hx')
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
             hit_Number.append("hx")
-            self.one_hit_per_episode += 1
-            self.total_reward += reward
+            # self.one_hit_per_episode += 1
+            # self.total_reward += reward
 
         if abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
-            reward += 1
-            print('hit hy')
+            #reward += 1
+            #print('hit hy')
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
             hit_Number.append("hy")
-            self.one_hit_per_episode += 1
-            self.total_reward += reward
+            #self.one_hit_per_episode += 1
+            #self.total_reward += reward
 
         if (len(hit_Number) > 1):
             reward += len(hit_Number) * 100
+        
             print(hit_Number)
             self.total_reward += reward
+        elif(len(hit_Number) == 1):
+            print("hit one", hit_Number)
+            reward += 1
+            self.one_hit_per_episode += 1
+            self.total_reward += reward
+
+
         
                 
         # Major axis critique 
@@ -1098,5 +1106,5 @@ class OrekitEnv(gym.Env):
                 f.write(str(reward)+'\n')
                 
     def write_episode_stats(self):
-        with open('results/episode_stats/' + str(self.id) + "_" + self.alg + ".csv", "w+") as f:
+        with open('results/episode_stats/' + str(self.id) + "_" + self.alg + ".csv", "a") as f:
             f.write(str(self.episode_num) + ',' + str(self.total_reward) + ',' + str(self.curr_fuel_mass) + ',' + str(self.curr_dist) + '\n')
