@@ -927,12 +927,14 @@ class OrekitEnv(gym.Env):
             return reward, done
               
         # Give more reward for when individual elements get close to target value
+        hit_Number = []
         if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a']:
             reward += 1
             print('hit a')
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
+            hit_Number.append("a")
             self.one_hit_per_episode += 1
             self.total_reward += reward
         
@@ -942,6 +944,7 @@ class OrekitEnv(gym.Env):
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
+            hit_Number.append("ex")
             self.one_hit_per_episode += 1
             self.total_reward += reward
             
@@ -951,6 +954,7 @@ class OrekitEnv(gym.Env):
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
+            hit_Number.append("ey")
             self.one_hit_per_episode += 1
             self.total_reward += reward
         
@@ -960,6 +964,7 @@ class OrekitEnv(gym.Env):
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
+            hit_Number.append("hx")
             self.one_hit_per_episode += 1
             self.total_reward += reward
 
@@ -969,80 +974,15 @@ class OrekitEnv(gym.Env):
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
+            hit_Number.append("hy")
             self.one_hit_per_episode += 1
             self.total_reward += reward
-        
-        
-        #Better multiples implemetation 
-        if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a'] and \
-           abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex']:
-            reward += 100000
+
+        if (len(hit_Number) > 1):
+            reward += len(hit_Number) * 100
+            print(hit_Number)
             self.total_reward += reward
-            print('hit a ex')
-            return reward, done
         
-        if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a'] and \
-           abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey']:
-            reward += 100000
-            self.total_reward += reward
-            print('hit a ey')
-            return reward, done
-        
-        if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a'] and \
-           abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx']:
-            reward += 100000
-            self.total_reward += reward
-            print('hit a hx')
-            # Create state file for successful mission
-            return reward, done
-        
-        if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a'] and \
-           abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
-            reward += 100000
-            self.total_reward += reward
-            print('hit a hy')
-            # Create state file for successful mission
-            return reward, done
-        
-        if abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex'] and \
-           abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey']:
-            reward += 100000
-            self.total_reward += reward
-            print('hit ex ey')
-            # Create state file for successful mission
-            return reward, done
-        
-        if abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex'] and \
-           abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hy']:
-            reward += 100000
-            self.total_reward += reward
-            print('hit ex hy')
-            # Create state file for successful mission
-            return reward, done
-        
-        if abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] and \
-           abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx']:
-            reward += 100000
-            self.total_reward += reward
-            print('hit ey hx')
-            # Create state file for successful mission
-            return reward, done
-        
-        if  abs(self.r_target_state[2] - state[2]) <= self._orbit_tolerance['ey'] and \
-            abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy']:
-            reward += 100000
-            self.total_reward += reward
-            print('hit ey hy')
-            # Create state file for successful mission
-            return reward, done
-        
-        if abs(self.r_target_state[4] - state[4]) <= self._orbit_tolerance['hy'] and \
-           abs(self.r_target_state[3] - state[3]) <= self._orbit_tolerance['hx']:
-            reward += 100000
-            self.total_reward += reward
-            print('hit hy hx')
-            # Create state file for successful mission
-            return reward, done
                 
         # Major axis critique 
         if state[0] < self.r_target_state[0]:
