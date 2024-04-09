@@ -71,7 +71,7 @@ def train_model(alg, initial_state, target_state, simulation_date,
    # Define the action noise (continuous action space)
    # action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.3 * np.ones(n_actions))
-   policy_kwargs = dict(net_arch=[256, 256])
+   policy_kwargs = dict(net_arch=[128, 128])
 
    if(alg == "DDPG"):
       # Create the TD3 model
@@ -79,7 +79,7 @@ def train_model(alg, initial_state, target_state, simulation_date,
    elif(alg == "TD3"):
       model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01, policy_delay=5)
    elif alg == 'PPO':
-      model = PPO('MlpPolicy', env, device='auto')
+      model = PPO('MlpPolicy', env, device='auto', policy_kwargs=policy_kwargs)
    else:
       print("Unknown model, check again and run")
       sys.exit()
@@ -91,7 +91,8 @@ def train_model(alg, initial_state, target_state, simulation_date,
    # model.set_env(env)
 
    # Train & save model
-   model.learn(total_timesteps=415000, log_interval=10)
+   # 415000
+   model.learn(total_timesteps=400000, log_interval=10)
    model.save('models/'+str(env.id)+"_"+ alg +"_model")
 
    # Generate .txt of reward/episode trained

@@ -858,13 +858,16 @@ class OrekitEnv(gym.Env):
         distance_change_constant = 0.1 if distance_change > 0 else -0.1
 
         # penalize having lower altitude than both the target and initial state (hopefully will discourage crashing into)
-        a_penalty = curr_state[0] - 1000+EARTH_RADIUS # positive = A is greater than min altitude (1000)
+
+        a_penalty = curr_state[0] - 1000000 + EARTH_RADIUS # positive = A is greater than min altitude (1000 km)
         a_penalty = 0 if a_penalty > 0 else a_penalty * 100
 
         fuel_consumed = self.prev_fuel - self.curr_fuel_mass
         total_fuel_consumed = self.fuel_mass - self.curr_fuel_mass
         consecutive_action_penalty = self.consecutive_actions * -10 if self.consecutive_actions > 5 else 0
-        action_penalty = 0.1 if self.did_action else 0
+        action_penalty = 0.01 if self.did_action else 0
+
+        # reward based on if the current distance < initial distance
 
         # reward = -1 * 10*curr_dist_value + 5*distance_change - 0.1*fuel_consumed - a_penalty**2 + consecutive_action_penalty
         # reward = -curr_dist_value - fuel_consumed
@@ -903,8 +906,8 @@ class OrekitEnv(gym.Env):
            abs(self.r_target_state[4] - curr_state[4]) <= self._orbit_tolerance['hy']:
             print('\nhit')
             reward = 100000 # multiply by % fuel left
-            if not self.randomize: # if the initial states are not randomized at each episode (initial states always the same)
-                self.fuel_mass = total_fuel_consumed * 1.5 # set max fuel usage to current fuel
+            # if not self.randomize: # if the initial states are not randomized at each episode (initial states always the same)
+            #     self.fuel_mass = total_fuel_consumed * 1.5 # set max fuel usage to current fuel
             done = True
             self.target_hit = True
             self.n_hits += 1
@@ -922,7 +925,7 @@ class OrekitEnv(gym.Env):
         elif self._currentOrbit.getA() < EARTH_RADIUS:
             print('\nIn earth')
             print('Distance:', curr_dist_value)
-            reward = -total_fuel_consumed
+            reward = -100000
             done = True
 
         # Mission duration exceeded

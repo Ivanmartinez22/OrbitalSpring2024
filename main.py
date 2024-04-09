@@ -40,9 +40,9 @@ spacecraft_mass = [500.0, 150.0]
 simulation_stepT = 500.0
 visualize = True
 
-model = load_model('PPO', 'models/73560_PPO_model')
-predict(model, initial_state, target_state, simulation_date, 
-            simulation_duration, spacecraft_mass, simulation_stepT, visualize)
-
-# train_model("PPO", initial_state, target_state, simulation_date, 
+# model = load_model('PPO', 'models/29652_PPO_model')
+# predict(model, initial_state, target_state, simulation_date, 
 #             simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+
+train_model("PPO", initial_state, target_state, simulation_date, 
+            simulation_duration, spacecraft_mass, simulation_stepT, False)
