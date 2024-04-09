@@ -398,6 +398,7 @@ class OrekitEnv(gym.Env):
         self.consecutive_actions = 0
         self.curr_dist = 0
         self.n_hits = 0
+        self.initial_dist = 0
 
         # Fuel params
         self.dry_mass = mass[0]
@@ -857,7 +858,8 @@ class OrekitEnv(gym.Env):
         initial_dist[4] = abs(self.r_target_state[4] - initial_state[4]) / self.r_target_state[4]
         initial_dist_value = np.sum(initial_dist)
 
-        self.initial_dist = curr_dist_value
+        self.initial_dist = initial_dist_value
+
 
         curr_velocity_mag = np.linalg.norm(curr_velocity)
         curr_velocity_mag = 1 if curr_velocity_mag < 1 else curr_velocity_mag # only scale if velocity mag >= 1
@@ -890,22 +892,8 @@ class OrekitEnv(gym.Env):
         # print('a penalty:', a_penalty)
         # print('action penalty:', action_penalty)
 
-
-
         # print(distance_change_reward)
         # print(curr_dist_value)
-
-        # reward_a = np.sqrt((self.r_target_state[0] - state[0])**2) / self.r_target_state[0]
-        # reward_ex = np.sqrt((self.r_target_state[1] - state[1])**2)
-        # reward_ey = np.sqrt((self.r_target_state[2] - state[2])**2)
-        # reward_hx = np.sqrt((self.r_target_state[3] - state[3])**2)
-        # reward_hy = np.sqrt((self.r_target_state[4] - state[4])**2)
-
-        # reward_a2 = np.sqrt((self.r_initial_state[0] - state[0])**2) / self.r_initial_state[0]
-        # reward_ex2 = np.sqrt((self.r_initial_state[1] - state[1])**2)
-        # reward_ey2 = np.sqrt((self.r_initial_state[2] - state[2])**2)
-        # reward_hx2 = np.sqrt((self.r_initial_state[3] - state[3])**2)
-        # reward_hy2 = np.sqrt((self.r_initial_state[4] - state[4])**2)
 
         # reward = -(reward_a + reward_hx*10 + reward_hy*10 + reward_ex + reward_ey) * self.n_actions
         # print(reward)
@@ -948,6 +936,11 @@ class OrekitEnv(gym.Env):
             reward = -total_fuel_consumed
             if self.n_actions == 0: # penalize doing nothing
                 reward = -10000000
+            done = True
+
+        elif curr_dist_value > initial_dist_value * 20:
+            print('\nToo far from target')
+            reward = -1000
             done = True
 
         self.total_reward += reward
@@ -1009,4 +1002,4 @@ class OrekitEnv(gym.Env):
 
     def write_episode_stats(self):
         with open('results/episode_stats/' + str(self.id) + "_" + self.alg + ".csv", "a") as f:
-            f.write(str(self.episode_num) + ',' + str(self.total_reward) + ',' + str(self.curr_fuel_mass) + ',' + str(self.curr_dist) + ', ' + str(self.n_hits) + '\n')
+            f.write(str(self.episode_num) + ',' + str(self.total_reward) + ',' + str(self.curr_fuel_mass) + ',' + str(self.curr_dist) + ', ' + str(self.n_hits) + ', ' + str(self.initial_dist) + '\n')
