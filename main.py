@@ -45,16 +45,29 @@ simulation_stepT = 500.0
 user_viz_in = input("Turn on Live visualizer for predictions and training (y/n): ")
 user_train_predict_in = input("Enter 1 for predict, Enter 2 for training: ")
 visualize = False
+
+
 if user_viz_in == "y":
     visualize = True
 
+
+# action_space = "simple"
+action_space = "discrete"
+
+
+# thrust_type = "simple"
+thrust_type = "discrete"    
+
+
+
 if user_train_predict_in == "1":
-    model = load_model('PPO', 'models/52977_PPO_model')
-    predict(model, initial_state, target_state, simulation_date, 
-                simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+    model = load_model('PPO', 'models/97164_PPO_model')
+    predict(model, initial_state, target_state, simulation_date,
+                simulation_duration, spacecraft_mass, simulation_stepT, visualize, action_space, thrust_type)
 else:
-    train_model("PPO", initial_state, target_state, simulation_date, 
-                simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+    train_model("PPO", initial_state, target_state, simulation_date,
+                simulation_duration, spacecraft_mass, simulation_stepT, visualize, action_space, thrust_type)
+
     
 
 print("--- %s seconds ---" % (time.time() - start_time))

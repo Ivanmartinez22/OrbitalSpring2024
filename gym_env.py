@@ -319,7 +319,7 @@ class OrekitEnv(gym.Env):
     This class uses Orekit to create an environment to propagate a satellite
     """
 
-    def __init__(self, state, state_targ, date, duration, mass, stepT, live_viz):
+    def __init__(self, state, state_targ, date, duration, mass, stepT, live_viz, action_space_type, thrust_type):
         """
         Params:
         state: Kepler coordinates of current state
@@ -436,18 +436,26 @@ class OrekitEnv(gym.Env):
 
         self.stepT = stepT
         self.live_viz = live_viz
+        self.thrust_type = thrust_type
+        self.action_space_type = action_space_type
 
         # OpenAI API to define 3D continous action space vector [a,b,c]
         # Velocity in the following directions:
             # radial: line formed from center of earth to satellite, 
             # tangential: facing in the direction of movement perpendicular to radial
             # normal: perpendicular to orbit plane
-        # self.action_space = spaces.Box(
-        #     low=-1,
-        #     high=1,
-        #     shape=(4,),
-        #     dtype=np.float32
-        # )
+        self.thrust_values = []
+        self.action_space = spaces.Box(
+                low=-1,
+                high=1,
+                shape=(4,),
+                dtype=np.float32
+            )
+        self.consecutive_actions = 0
+        if action_space_type == "discrete":
+            self.thrust_values = [-100, -75, -50, -25, 0, 25, 50, 75, 100]
+            self.action_space = spaces.MultiDiscrete([len(self.thrust_values)] * 3)
+            
         # self.observation_space = 10  # states | Equinoctial components + derivatives
         # OpenAI API
         # state params + derivatives (could include target in future)
@@ -474,9 +482,7 @@ class OrekitEnv(gym.Env):
             plt.ion()
             
         # new discrete action space
-        self.thrust_values = [-100, -75, -50, -25, 0, 25, 50, 75, 100]
-        self.action_space = spaces.MultiDiscrete([len(self.thrust_values)] * 3)
-        self.consecutive_actions = 0
+        
 
 
 
@@ -732,20 +738,29 @@ class OrekitEnv(gym.Env):
         # radial, tangential, normal (not sure what order)
         # vel = Vector3D(float(input[0])*50, float(input[1])*50, float(input[2])*50)
         # thrust_bool = input[3] > 0 # model decides if it actually does performs a maneuver
-        compute_thrust_val = lambda x: float(self.thrust_values[x])
-        input = list(map(compute_thrust_val, input))
-        vel = Vector3D(*input)
+        if self.thrust_type == "discrete":
+            compute_thrust_val = lambda x: float(self.thrust_values[x])
+            input = list(map(compute_thrust_val, input))
+            vel = Vector3D(*input)
+        else:
+            vel = Vector3D(float(input[0])*50, float(input[1])*50, float(input[2])*50)
+            thrust_bool = input[3] > 0 # model decides if it actually does performs a maneuver
+            if thrust_bool: 
+                event_detector = DateDetector(self._extrap_Date.shiftedBy(0.01)) # detects when date is reached during propagation
+                impulse = ImpulseManeuver(event_detector, attitude, vel, self._isp) # applies velocity vector when event triggered
+                self._prop.addEventDetector(impulse) # add detector to propagator
+                self.n_actions += 1
 
         
         # Remove previous event detectors
         self._prop.clearEventsDetectors()
 
         # Add force model
-        # if thrust_bool:
-        event_detector = DateDetector(self._extrap_Date.shiftedBy(0.01)) # detects when date is reached during propagation
-        impulse = ImpulseManeuver(event_detector, attitude, vel, self._isp) # applies velocity vector when event triggered
-        self._prop.addEventDetector(impulse) # add detector to propagator
-        self.n_actions += 1
+        if self.thrust_type == "discrete":
+            event_detector = DateDetector(self._extrap_Date.shiftedBy(0.01)) # detects when date is reached during propagation
+            impulse = ImpulseManeuver(event_detector, attitude, vel, self._isp) # applies velocity vector when event triggered
+            self._prop.addEventDetector(impulse) # add detector to propagator
+            self.n_actions += 1
 
         # Propagate
         # if self.last_a > 0:

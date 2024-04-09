@@ -47,9 +47,9 @@ def load_model(alg, model):
 
 
 def predict(model, initial_state, target_state, simulation_date, 
-                   simulation_duration, spacecraft_mass, simulation_stepT, visualize):
+                   simulation_duration, spacecraft_mass, simulation_stepT, visualize, action_space, thrust_type):
    env = OrekitEnv(initial_state, target_state, simulation_date, 
-                   simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+                   simulation_duration, spacecraft_mass, simulation_stepT, visualize, action_space, thrust_type)
    model.set_env(env)
    state = env.reset()
    done = False
@@ -62,11 +62,11 @@ def predict(model, initial_state, target_state, simulation_date,
    
 
 def train_model(alg, initial_state, target_state, simulation_date, 
-                simulation_duration, spacecraft_mass, simulation_stepT, visualize):
+                simulation_duration, spacecraft_mass, simulation_stepT, visualize, action_space, thrust_type):
 
    # Create environment instance
    env = OrekitEnv(initial_state, target_state, simulation_date, 
-                   simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+                   simulation_duration, spacecraft_mass, simulation_stepT, visualize, action_space, thrust_type)
    # Get action space from environment
    n_actions = env.action_space.shape[-1]
    # Define the action noise (continuous action space)
