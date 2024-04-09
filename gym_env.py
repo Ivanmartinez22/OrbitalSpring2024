@@ -824,6 +824,7 @@ class OrekitEnv(gym.Env):
         curr_state = self.get_state(self._currentOrbit)
         curr_velocity = curr_state[6:12]
         prev_state = self.get_state(self._prevOrbit, with_derivatives=False)
+        initial_state = self.get_state(self.initial_orbit)
 
         # prev_k = self.convert_to_keplerian(self._prevOrbit)
         # curr_k = self.convert_to_keplerian(self._currentOrbit)
@@ -832,6 +833,7 @@ class OrekitEnv(gym.Env):
 
         curr_dist = np.zeros(5)
         prev_dist = np.zeros(5)
+        initial_dist = np.zeros(5)
 
         curr_dist[0] = abs(self.r_target_state[0] - curr_state[0]) / self.r_target_state[0]
         curr_dist[1] = abs(self.r_target_state[1] - curr_state[1]) / self.r_target_state[1]
@@ -847,6 +849,15 @@ class OrekitEnv(gym.Env):
         prev_dist[3] = abs(self.r_target_state[3] - prev_state[3]) / self.r_target_state[3]
         prev_dist[4] = abs(self.r_target_state[4] - prev_state[4]) / self.r_target_state[4]
         prev_dist_value = np.sum(prev_dist)
+
+        initial_dist[0] = abs(self.r_target_state[0] - initial_state[0]) / self.r_target_state[0]
+        initial_dist[1] = abs(self.r_target_state[1] - initial_state[1]) / self.r_target_state[1]
+        initial_dist[2] = abs(self.r_target_state[2] - initial_state[2]) / self.r_target_state[2]
+        initial_dist[3] = abs(self.r_target_state[3] - initial_state[3]) / self.r_target_state[3]
+        initial_dist[4] = abs(self.r_target_state[4] - initial_state[4]) / self.r_target_state[4]
+        initial_dist_value = np.sum(initial_dist)
+
+        self.initial_dist = curr_dist_value
 
         curr_velocity_mag = np.linalg.norm(curr_velocity)
         curr_velocity_mag = 1 if curr_velocity_mag < 1 else curr_velocity_mag # only scale if velocity mag >= 1
@@ -865,13 +876,15 @@ class OrekitEnv(gym.Env):
         fuel_consumed = self.prev_fuel - self.curr_fuel_mass
         total_fuel_consumed = self.fuel_mass - self.curr_fuel_mass
         consecutive_action_penalty = self.consecutive_actions * -10 if self.consecutive_actions > 5 else 0
-        action_penalty = 0.01 if self.did_action else 0
+        action_penalty = 0.1 if self.did_action else 0
+        initial_difference = initial_dist_value - curr_dist_value # positive value = closer than initial
+        initial_difference = 0 if initial_difference < 0 else initial_difference # dont penalize being further
 
-        # reward based on if the current distance < initial distance
 
         # reward = -1 * 10*curr_dist_value + 5*distance_change - 0.1*fuel_consumed - a_penalty**2 + consecutive_action_penalty
         # reward = -curr_dist_value - fuel_consumed
-        reward = -curr_dist_value + distance_change_constant - a_penalty - action_penalty
+        # reward = -curr_dist_value + distance_change_constant - a_penalty - action_penalty
+        reward = -curr_dist_value + initial_difference - a_penalty - action_penalty
         # print('distance reward:', curr_dist_value)
         # print('distance change:', distance_change)
         # print('a penalty:', a_penalty)

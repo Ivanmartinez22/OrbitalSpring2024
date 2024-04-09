@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # timestep = 53*60+44
 # env = OrekitEnv(initial_state, target_state, simulation_date, simulation_duration, spacecraft_mass, timestep)
 
-data = pd.read_csv('results/episode_stats/20783_PPO.csv')
+data = pd.read_csv('results/episode_stats/4229_PPO.csv')
 # data = pd.read_csv('results/episode_stats/distance_only_discrete_4964.csv')
 data = data[(data.iloc[:,1] > -100000) & (data.iloc[:,1] < 10000)]
 episode = data.iloc[:,0]
