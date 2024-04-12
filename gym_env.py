@@ -431,7 +431,9 @@ class OrekitEnv(gym.Env):
         self.create_Propagator() # set self._prop with NumericalPropagator
         self.setForceModel() # update self._prop to include HolmesFeatherstoneAttractionModel ForceModel
 
+        self.steps = 0
         self.stepT = stepT
+        self.duration = duration
         self.live_viz = live_viz
 
         # OpenAI API to define 3D continous action space vector [a,b,c]
@@ -606,6 +608,7 @@ class OrekitEnv(gym.Env):
 
         self.n_actions = 0
         self.consecutive_actions = 0
+        self.steps = 0
 
         # Randomizes the initial orbit (initial state +- random variable)
         if self.randomize:
@@ -762,6 +765,7 @@ class OrekitEnv(gym.Env):
             state = self.get_state(self._currentOrbit)
             return state, -1, True, {}
         
+        self.steps += 1
 
         # set current state equal to newly propagated state
         self.curr_fuel_mass = currentState.getMass() - self.dry_mass
@@ -882,11 +886,14 @@ class OrekitEnv(gym.Env):
         initial_difference = initial_dist_value - curr_dist_value # positive value = closer than initial
         initial_difference = 0 if initial_difference < 0 else initial_difference # dont penalize being further
 
+        shifted_curr_dist = -(curr_dist_value - initial_dist_value)**3 # at start = 0, near 0 dist = highly increasing reward, large dist = highly increasing penalty
+
 
         # reward = -1 * 10*curr_dist_value + 5*distance_change - 0.1*fuel_consumed - a_penalty**2 + consecutive_action_penalty
         # reward = -curr_dist_value - fuel_consumed
         # reward = -curr_dist_value + distance_change_constant - a_penalty - action_penalty
-        reward = -curr_dist_value + initial_difference*10 - a_penalty - action_penalty
+        # reward = -curr_dist_value + initial_difference*10 - a_penalty - action_penalty # more reward for going slow (more accumulated reward)
+        reward = shifted_curr_dist - a_penalty
         # print('distance reward:', curr_dist_value)
         # print('distance change:', distance_change)
         # print('a penalty:', a_penalty)
@@ -906,7 +913,9 @@ class OrekitEnv(gym.Env):
            abs(self.r_target_state[3] - curr_state[3]) <= self._orbit_tolerance['hx'] and \
            abs(self.r_target_state[4] - curr_state[4]) <= self._orbit_tolerance['hy']:
             print('\nhit')
-            reward = 100000 # multiply by % fuel left
+            fuel_reward = 100000 * self.curr_fuel_mass / self.fuel_mass # reward multiplied by % fuel left
+            time_reward = 100000 * (self.steps * self.stepT) / self.duration # reward multiplied by % time left
+            reward = fuel_reward + time_reward
             # if not self.randomize: # if the initial states are not randomized at each episode (initial states always the same)
             #     self.fuel_mass = total_fuel_consumed * 1.5 # set max fuel usage to current fuel
             done = True
