@@ -213,6 +213,10 @@ class OrekitEnv(gym.Env):
         self.action_bound = 0.6  # Max thrust limit
         self._isp = 3100.0 
 
+        self.n_hits = 0
+        self.initial_dist = 0
+        self.curr_dist = 0
+
         # set self.r_target_state and self.r_initial_state with data from _targetOrbit and _orbit (convert from KeplerianOrbit to np.array)
         # (originally from state and state_targ parameters)
         self.r_target_state = self.get_state(self._targetOrbit)
@@ -338,6 +342,8 @@ class OrekitEnv(gym.Env):
         Resets the orekit enviornment
         :return:
         """
+
+        self.write_episode_stats()
 
         self._prop = None
         self._currentDate = None
@@ -530,6 +536,28 @@ class OrekitEnv(gym.Env):
         done = False
 
         state = self.get_state(self._currentOrbit, with_derivatives=False)
+        initial_state = self.get_state(self.initial_orbit)
+
+
+        curr_dist = np.zeros(5)
+        initial_dist = np.zeros(5)
+
+        curr_dist[0] = abs(self.r_target_state[0] - state[0]) / self.r_target_state[0]
+        curr_dist[1] = abs(self.r_target_state[1] - state[1]) / self.r_target_state[1]
+        curr_dist[2] = abs(self.r_target_state[2] - state[2]) / self.r_target_state[2]
+        curr_dist[3] = abs(self.r_target_state[3] - state[3]) / self.r_target_state[3]
+        curr_dist[4] = abs(self.r_target_state[4] - state[4]) / self.r_target_state[4]
+        curr_dist_value = np.sum(curr_dist)
+        self.curr_dist = curr_dist_value
+
+        initial_dist[0] = abs(self.r_target_state[0] - initial_state[0]) / self.r_target_state[0]
+        initial_dist[1] = abs(self.r_target_state[1] - initial_state[1]) / self.r_target_state[1]
+        initial_dist[2] = abs(self.r_target_state[2] - initial_state[2]) / self.r_target_state[2]
+        initial_dist[3] = abs(self.r_target_state[3] - initial_state[3]) / self.r_target_state[3]
+        initial_dist[4] = abs(self.r_target_state[4] - initial_state[4]) / self.r_target_state[4]
+        initial_dist_value = np.sum(initial_dist)
+
+        self.initial_dist = initial_dist_value
 
         reward_a = np.sqrt((self.r_target_state[0] - state[0])**2) / self.r_target_state[0]
         reward_ex = np.sqrt((self.r_target_state[1] - state[1])**2)
@@ -549,6 +577,7 @@ class OrekitEnv(gym.Env):
             reward += 1
             done = True
             print('hit')
+            self.n_hits += 1
             self.target_hit = True
             # Create state file for successful mission
             self.write_state()
@@ -625,3 +654,8 @@ class OrekitEnv(gym.Env):
         with open("results/reward/"+str(self.id)+"_"+self.alg+"_reward"+".txt", "w") as f:
             for reward in self.episode_reward:
                 f.write(str(reward)+'\n')
+
+
+    def write_episode_stats(self):
+        with open('results/episode_stats/' + str(self.id) + "_" + self.alg + ".csv", "a") as f:
+            f.write(str(self.episode_num) + ',' + str(self.total_reward) + ',' + str(self.curr_fuel_mass) + ',' + str(self.curr_dist) + ', ' + str(self.n_hits) + ', ' + str(self.initial_dist) + '\n')
