@@ -886,7 +886,8 @@ class OrekitEnv(gym.Env):
         initial_difference = initial_dist_value - curr_dist_value # positive value = closer than initial
         initial_difference = 0 if initial_difference < 0 else initial_difference # dont penalize being further
 
-        shifted_curr_dist = -(curr_dist_value - initial_dist_value)**3 # at start = 0, near 0 dist = highly increasing reward, large dist = highly increasing penalty
+        shifted_curr_dist = -(curr_dist_value - initial_dist_value)**3 - initial_dist_value**3 # originally wasnt shifted down
+        # -10 * curr if curr < initial else -1/10 *  (curr-initial) - 10*initial
 
 
         # reward = -1 * 10*curr_dist_value + 5*distance_change - 0.1*fuel_consumed - a_penalty**2 + consecutive_action_penalty
@@ -913,8 +914,8 @@ class OrekitEnv(gym.Env):
            abs(self.r_target_state[3] - curr_state[3]) <= self._orbit_tolerance['hx'] and \
            abs(self.r_target_state[4] - curr_state[4]) <= self._orbit_tolerance['hy']:
             print('\nhit')
-            fuel_reward = 100000 * self.curr_fuel_mass / self.fuel_mass # reward multiplied by % fuel left
-            time_reward = 100000 * (self.steps * self.stepT) / self.duration # reward multiplied by % time left
+            fuel_reward = 10000 * self.curr_fuel_mass / self.fuel_mass # reward multiplied by % fuel left
+            time_reward = 10000 * (self.duration - (self.steps * self.stepT)) / self.duration # reward multiplied by % time left
             reward = fuel_reward + time_reward
             # if not self.randomize: # if the initial states are not randomized at each episode (initial states always the same)
             #     self.fuel_mass = total_fuel_consumed * 1.5 # set max fuel usage to current fuel
@@ -935,7 +936,7 @@ class OrekitEnv(gym.Env):
         elif self._currentOrbit.getA() < EARTH_RADIUS:
             print('\nIn earth')
             print('Distance:', curr_dist_value)
-            reward = -100000
+            reward = -10000
             done = True
 
         # Mission duration exceeded
