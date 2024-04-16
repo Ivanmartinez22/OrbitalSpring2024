@@ -886,7 +886,8 @@ class OrekitEnv(gym.Env):
         initial_difference = initial_dist_value - curr_dist_value # positive value = closer than initial
         initial_difference = 0 if initial_difference < 0 else initial_difference # dont penalize being further
 
-        shifted_curr_dist = -(curr_dist_value - initial_dist_value)**3 - initial_dist_value**3 # originally wasnt shifted down
+        # shifted_curr_dist = -(curr_dist_value - initial_dist_value)**3 - initial_dist_value**3 # originally wasnt shifted down
+        distance_penalty = -10 * curr_dist_value if curr_dist_value <= initial_dist_value else -1/10 *  (curr_dist_value-initial_dist_value) - 10*initial_dist_value
         # -10 * curr if curr < initial else -1/10 *  (curr-initial) - 10*initial
 
 
@@ -894,7 +895,9 @@ class OrekitEnv(gym.Env):
         # reward = -curr_dist_value - fuel_consumed
         # reward = -curr_dist_value + distance_change_constant - a_penalty - action_penalty
         # reward = -curr_dist_value + initial_difference*10 - a_penalty - action_penalty # more reward for going slow (more accumulated reward)
-        reward = shifted_curr_dist - a_penalty
+        # reward = shifted_curr_dist - a_penalty
+        reward = distance_penalty
+        
         # print('distance reward:', curr_dist_value)
         # print('distance change:', distance_change)
         # print('a penalty:', a_penalty)
@@ -936,7 +939,7 @@ class OrekitEnv(gym.Env):
         elif self._currentOrbit.getA() < EARTH_RADIUS:
             print('\nIn earth')
             print('Distance:', curr_dist_value)
-            reward = -10000
+            reward = -1000
             done = True
 
         # Mission duration exceeded
