@@ -72,13 +72,20 @@ def parse_data(file_path):
     with open(file_path, 'r') as file:
         lines = file.readlines()
 
+    dataset_num = input("Enter Which Dataset to Use: ")
+    foundDataset = False
+
     print("LINES: ", lines)
     
     for i, line in enumerate(lines):
         parts = line.strip().split(', ')
         
-        if parts[0] == '1':
+        while foundDataset == False:
+            continue
+
+        if parts[0] == dataset_num:
             parsed_data["data_set_number"] = parts[0]
+            foundDataset = True
         elif parts[0] in ['keplerian','cartesian']:
             parsed_data["coordinate_type"] = line
         elif parts[0] in ['initial', 'final']:

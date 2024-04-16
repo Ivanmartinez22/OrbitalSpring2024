@@ -26,6 +26,7 @@ from matplotlib.widgets import Slider
 
 import pyorb
 import time
+import csv
 
 
 OUTPUT_PATH = Path(__file__).parent
@@ -114,6 +115,47 @@ target = pyorb.Orbit(
 #     return vel
 
 def plot():
+    fig = Figure(figsize=(7, 7))  # Adjust size as needed
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Define initial plot setup
+    r = orb.r
+    t = target.r
+    l, = ax.plot(r[0, :], r[1, :], r[2, :], '-b', label='Current State')
+    fin, = ax.plot(t[0, :], t[1, :], t[2, :], '-r', label='Target State')
+    dot, = ax.plot([r[0, 0]], [r[1, 0]], [r[2, 0]], 'ob')
+    ax.plot([0], [0], [0], 'og', label='Earth')
+
+    ax.legend(loc="upper left")
+    ax.set_title('Orbit Visualization', fontsize=22)
+    ax.set_xlabel('X-position [m]', fontsize=15, labelpad=20)
+    ax.set_ylabel('Y-position [m]', fontsize=15, labelpad=20)
+    ax.set_zlabel('Z-position [m]', fontsize=15, labelpad=20)
+    ax.set_xlim([-ax_lims, ax_lims])
+    ax.set_ylim([-ax_lims, ax_lims])
+    ax.set_zlim([-ax_lims, ax_lims])
+
+    # Embed the Figure in the tkinter window
+    canvas = FigureCanvasTkAgg(fig, master=window)
+    canvas.draw()
+    canvas_widget = canvas.get_tk_widget()
+    canvas_widget.place(x=742, y=46, width=621, height=521)
+
+    # Create and place sliders
+    axcolor = 'lightgoldenrodyellow'
+    ax_a = fig.add_axes([0.25, 0.05, 0.65, 0.03], facecolor=axcolor)
+    ax_e = fig.add_axes([0.25, 0.10, 0.65, 0.03], facecolor=axcolor)
+    ax_i = fig.add_axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
+    ax_omega = fig.add_axes([0.25, 0.20, 0.65, 0.03], facecolor=axcolor)
+    ax_Omega = fig.add_axes([0.25, 0.25, 0.65, 0.03], facecolor=axcolor)
+    ax_nu = fig.add_axes([0.25, 0.30, 0.65, 0.03], facecolor=axcolor)
+
+    s_a = Slider(ax_a, 'a [m]', 5400*1e3, 6400*1e3, valinit=6300000)
+    s_e = Slider(ax_e, 'e [1]', 0, 1, valinit=0.23)
+    s_i = Slider(ax_i, 'i [deg]', 0, 360, valinit=5.3)
+    s_omega = Slider(ax_omega, 'omega [deg]', 0, 360, valinit=24)
+    s_Omega = Slider(ax_Omega, 'Omega [deg]', 0, 360, valinit=24)
+    s_nu = Slider(ax_nu, 'nu [deg]', 0, 360, valinit=180)
 
     def draw():
         r = orb.r
@@ -131,10 +173,6 @@ def plot():
         fin.set_ydata(t[1, 1:])
         fin.set_3d_properties(t[2, 1:])
 
-        # global vel
-        # vel.remove()
-        # vel = add_vel(ax)
-
         fig.canvas.draw_idle()
 
     def update_orb(val):
@@ -146,48 +184,6 @@ def plot():
         orb.Omega = Omega * 4
         orb._kep[5, 0] = nu * 4
         draw()
-
-    r = orb.r
-    fig = plt.figure(figsize=(7, 7))
-    ax = fig.add_subplot(111, projection='3d')
-    plt.subplots_adjust(left=0.25, bottom=0.25)
-    l, = ax.plot(r[0, :], r[1, :], r[2, :], '-b', label='Current State')
-    fin, = ax.plot(r[0, :], r[1, :], r[2, :], '-r', label='Target State')
-    dot, = ax.plot([r[0, 0]], [r[1, 0]], [r[2, 0]], 'ob') # Current orbit
-    # vel = add_vel(ax)
-    ax.plot([0], [0], [0], 'og', label='Earth')
-    plt.legend(loc="upper left")
-
-
-    # Display Sliders
-    axr_b = fig.add_axes([0.05, 0.10, 0.05, 0.02])
-
-    ax.set_title('Orbit', fontsize=22)
-    ax.set_xlabel('X-position [m]', fontsize=15, labelpad=20)
-    ax.set_ylabel('Y-position [m]', fontsize=15, labelpad=20)
-    ax.set_zlabel('Z-position [m]', fontsize=15, labelpad=20)
-
-    ax.set_xlim([-ax_lims, ax_lims])
-    ax.set_ylim([-ax_lims, ax_lims])
-    ax.set_zlim([-ax_lims, ax_lims])
-
-    axcolor = 'lightgoldenrodyellow'
-    ax_a = plt.axes([0.25, 0.05, 0.2, 0.03], facecolor=axcolor)
-    ax_e = plt.axes([0.25, 0.1, 0.2, 0.03], facecolor=axcolor)
-    ax_i = plt.axes([0.25, 0.15, 0.2, 0.03], facecolor=axcolor)
-
-    ax_omega = plt.axes([0.6, 0.05, 0.2, 0.03], facecolor=axcolor)
-    ax_Omega = plt.axes([0.6, 0.1, 0.2, 0.03], facecolor=axcolor)
-    ax_nu = plt.axes([0.6, 0.15, 0.2, 0.03], facecolor=axcolor)
-
-    s_a = Slider(ax_a, 'a [m]', 5400*1e3, 6400*1e3, valinit=1)
-    s_e = Slider(ax_e, 'e [1]', 0, 1, valinit=0)
-    # s_e.is_hyp = False
-    s_i = Slider(ax_i, 'i [deg]', 4, 6, valinit=0)
-
-    s_omega = Slider(ax_omega, 'omega [deg]', 0, 40, valinit=0)
-    s_Omega = Slider(ax_Omega, 'Omega [deg]', 0, 40, valinit=0)
-    s_nu = Slider(ax_nu, 'nu [deg]', -180, 180, valinit=0)
 
     def current_state():
         time.sleep(1)
@@ -201,15 +197,31 @@ def plot():
             s_omega.set_val(omega)
             s_Omega.set_val(Omega)
             s_nu.set_val(nu)
-            plt.pause(0.1)
+            # plt.pause(0.1)
 
     current_state()
 
+    # Initial draw of the plot
+    canvas.draw_idle()
 
 window = Tk()
 
-window.geometry("1182x652")
+window.geometry("1400x652")
 window.configure(bg = "#1A1E20")
+
+
+# Export Button Functionality
+def export_to_csv(filename="exported_data.txt"):
+    # Not implemented as a separate thread...
+    command = "python main.py"
+    try:
+        result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='utf-8')
+        with open(filename, 'w') as file: file.write(result.stdout)
+    except subprocess.CalledProcessError as e:
+        print("AHHHHH: ", e.output)
+    except Exception as e:
+        print( "BAKBKUSBAFkuVAFu: ", str(e))
+
 
 
 
@@ -287,7 +299,7 @@ canvas = Canvas(
     window,
     bg = "#1A1E20",
     height = 652,
-    width = 1182,
+    width = 1400,
     bd = 0,
     highlightthickness = 0,
     relief = "ridge"
@@ -297,15 +309,16 @@ canvas.place(x = 0, y = 0)
 canvas.create_rectangle(
     725.0,
     28.0,
-    1182.0,
+    1382.0,
     651.0,
     fill="#1A1E20",
     outline="#049364")
 
+# Visualizer Rectangle Location
 canvas.create_rectangle(
     742.0,
     46.0,
-    1165.0,
+    1350.0,
     567.0,
     fill="#1A1E20",
     outline="#049364")
@@ -1049,17 +1062,18 @@ button_7.place(
     height=51.66482162475586
 )
 
+# Export Button
 button_image_8 = PhotoImage(
     file=relative_to_assets("button_8.png"))
 button_8 = Button(
     image=button_image_8,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print("button_8 clicked"),
+    command=lambda: export_to_csv(),
     relief="flat"
 )
 button_8.place(
-    x=1002.297607421875,
+    x=1182.297607421875,
     y=586.1273803710938,
     width=160.16094970703125,
     height=51.66482162475586
