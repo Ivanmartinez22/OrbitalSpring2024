@@ -352,6 +352,9 @@ class OrekitEnv(gym.Env):
         self.id = random.randint(1,100000)
         self.alg = ""
 
+        # trying to not reward once multiple targets are hit
+        self.multiple_hit = False
+
         # satellite position at each time step
         self.px = [] # satellite x position
         self.py = [] # satellite y position
@@ -616,6 +619,7 @@ class OrekitEnv(gym.Env):
         if self.randomize:
             self.initial_orbit = None
             self.one_hit_per_episode = 0
+            self.multiple_hit = False
             a_rand = self.seed_state[0]
             e_rand = self.seed_state[1]
             w_rand = self.seed_state[3]
@@ -635,6 +639,7 @@ class OrekitEnv(gym.Env):
             self._currentOrbit = self.create_orbit(state, self._initial_date) # might have to reference same object as _orbit
         else:
             self._currentOrbit = self.initial_orbit
+            self.multiple_hit = False
 
         # reset dates
         self._currentDate = self._initial_date
@@ -943,6 +948,7 @@ class OrekitEnv(gym.Env):
               
         # Give more reward for when individual elements get close to target value
         hit_Number = []
+        hit_Numberformat = []
         if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a']:
             #reward += 1
             #print('hit a')
@@ -950,16 +956,18 @@ class OrekitEnv(gym.Env):
             # Create state file for successful mission
             # self.write_state()
             hit_Number.append("a")
+            hit_Numberformat.append(0)
             #self.one_hit_per_episode += 1
             #self.total_reward += reward
         
         if abs(self.r_target_state[1] - state[1]) <= self._orbit_tolerance['ex']:
-            reward += 1
+            # reward += 1
             # print('hit ex')
             # self.target_hit = True
             # Create state file for successful mission
             # self.write_state()
             hit_Number.append("ex")
+            hit_Numberformat.append(1)
             # self.one_hit_per_episode += 1
             # self.total_reward += reward
             
@@ -970,6 +978,7 @@ class OrekitEnv(gym.Env):
             # Create state file for successful mission
             # self.write_state()
             hit_Number.append("ey")
+            hit_Numberformat.append(2)
             # self.one_hit_per_episode += 1
             # self.total_reward += reward
         
@@ -980,6 +989,7 @@ class OrekitEnv(gym.Env):
             # Create state file for successful mission
             # self.write_state()
             hit_Number.append("hx")
+            hit_Numberformat.append(3)
             # self.one_hit_per_episode += 1
             # self.total_reward += reward
 
@@ -990,17 +1000,22 @@ class OrekitEnv(gym.Env):
             # Create state file for successful mission
             # self.write_state()
             hit_Number.append("hy")
+            hit_Numberformat.append(4)
             #self.one_hit_per_episode += 1
             #self.total_reward += reward
 
         if (len(hit_Number) > 1):
             reward += len(hit_Number) * 100
-        
-            print(hit_Number)
+            print("hit multiple", hit_Number)
+            self.multiple_hit = True
             self.total_reward += reward
         elif(len(hit_Number) == 1):
-            print("hit one", hit_Number)
-            reward += 1
+            # once multiple targets are hit stop rewarding the function
+            if(self.multiple_hit == False):
+                reward += 1
+                print("hit one and rewarded", hit_Number)
+            else:
+                print("hit one and not rewarded", hit_Number)
             self.one_hit_per_episode += 1
             self.total_reward += reward
 
@@ -1008,21 +1023,19 @@ class OrekitEnv(gym.Env):
         
                 
         # Major axis critique 
-        if state[0] < self.r_target_state[0]:
-            reward -= 100
-            self.total_reward += reward
-            # print("Applying penalty for smaller a")
-
-        if abs(self.r_target_state[0] - state[0]) <= self._orbit_tolerance['a']:
-            reward += 1000
-            self.total_reward += reward
-            print("Applying reward for better a")
-
-        if (self.r_target_state[0]) < state[0]:
-            reward -= 100
-            self.total_reward += reward
-            # print("Applying penalty for bigger a")
-        
+        for i in range(len(hit_Numberformat)):
+            if abs(self.r_target_state[i] - state[i]) <= self._orbit_tolerance[hit_Number[i]]:
+                reward += 1000
+                self.total_reward += reward
+                print("Applying reward for better", hit_Number[i])
+            elif (self.r_target_state[i]) < state[i]:
+                reward -= 100
+                self.total_reward += reward
+                print("Applying penalty for bigger", hit_Number[i])
+            elif state[i] < self.r_target_state[i]:
+                reward -= 100
+                self.total_reward += reward
+                print("Applying penalty for smaller", hit_Number[i])
 
         if (2 * self.r_target_state[0]) < state[0]:
             reward -= 10000000
