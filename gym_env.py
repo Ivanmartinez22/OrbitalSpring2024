@@ -896,8 +896,7 @@ class OrekitEnv(gym.Env):
         # reward = -curr_dist_value + distance_change_constant - a_penalty - action_penalty
         # reward = -curr_dist_value + initial_difference*10 - a_penalty - action_penalty # more reward for going slow (more accumulated reward)
         # reward = shifted_curr_dist - a_penalty
-        reward = distance_penalty
-        
+        reward = -curr_dist_value
         # print('distance reward:', curr_dist_value)
         # print('distance change:', distance_change)
         # print('a penalty:', a_penalty)

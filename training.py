@@ -79,7 +79,7 @@ def train_model(alg, initial_state, target_state, simulation_date,
    elif(alg == "TD3"):
       model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01, policy_delay=5)
    elif alg == 'PPO':
-      model = PPO('MlpPolicy', env, gamma=0.99, device='auto', policy_kwargs=policy_kwargs)
+      model = PPO('MlpPolicy', env, device='auto', gamma=0.99, policy_kwargs=policy_kwargs)
    else:
       print("Unknown model, check again and run")
       sys.exit()
