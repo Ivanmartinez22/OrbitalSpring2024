@@ -56,6 +56,8 @@ from org.orekit.attitudes import LofOffset
 from orekit.pyhelpers import setup_orekit_curdir  
 from org.orekit.forces.gravity import NewtonianAttraction
 from org.orekit.utils import Constants
+from org.orekit.forces.maneuvers import ImpulseManeuver
+from org.orekit.propagation.events import DateDetector
 
 from org.hipparchus.geometry.euclidean.threed import Vector3D
 from orekit import JArray_double
@@ -200,8 +202,8 @@ class OrekitEnv(gym.Env):
         # OpenAI API to define 3D continous action space vector [a,b,c]
         # Force in radial, circumferential, and normal directions
         self.action_space = spaces.Box(
-            low=-0.6,
-            high=0.6,
+            low=-1,
+            high=1,
             shape=(3,),
             dtype=np.float32
         )
@@ -452,29 +454,52 @@ class OrekitEnv(gym.Env):
 
     # takes in action and computes state after action is performed
     # returns observation, reward, done, info
-    def step(self, thrust):
+    def step(self, vel):
         """
         Take a propagation step
         :param thrust: 3D Thrust vector (Newtons, float)
         :return: spacecraft state (np.array), reward value (float), done (bool)
         """
-        thrust_mag = np.linalg.norm(thrust)
-        thrust_dir = thrust / thrust_mag
-        DIRECTION = Vector3D(float(thrust_dir[0]), float(thrust_dir[1]), float(thrust_dir[2]))
+        # thrust_mag = np.linalg.norm(thrust)
+        # thrust_dir = thrust / thrust_mag
+        # DIRECTION = Vector3D(float(thrust_dir[0]), float(thrust_dir[1]), float(thrust_dir[2]))
         
-        if thrust_mag <= 0:
-            # DIRECTION = Vector3D.MINUS_J
-            thrust_mag = abs(float(thrust_mag))
-        else:
-            # DIRECTION = Vector3D.PLUS_J
-            thrust_mag = float(thrust_mag)
+        # if thrust_mag <= 0:
+        #     # DIRECTION = Vector3D.MINUS_J
+        #     thrust_mag = abs(float(thrust_mag))
+        # else:
+        #     # DIRECTION = Vector3D.PLUS_J
+        #     thrust_mag = float(thrust_mag)
 
-        # Add force model
-        thrust_force = ConstantThrustManeuver(self._extrap_Date, self.stepT, thrust_mag, self._isp, attitude, DIRECTION)
-        self._prop.addForceModel(thrust_force)
+        # # Add force model
+        # thrust_force = ConstantThrustManeuver(self._extrap_Date, self.stepT, thrust_mag, self._isp, attitude, DIRECTION)
+        # self._prop.addForceModel(thrust_force)
+
+        # # Propagate
+        # currentState = self._prop.propagate(self._extrap_Date.shiftedBy(self.stepT))
+
+        thrust_bool = vel[3] > 0 # model decides if it actually does performs a maneuver
+        vel = Vector3D(float(vel[0]), float(vel[1]), float(vel[2]))
+        self._prop.clearEventsDetectors()
+
+        if thrust_bool:
+            event_detector = DateDetector(self._extrap_Date.shiftedBy(0.01)) # detects when date is reached during propagation
+            impulse = ImpulseManeuver(event_detector, attitude, vel, self._isp) # applies velocity vector when event triggered
+            self._prop.addEventDetector(impulse) # add detector to propagator
 
         # Propagate
-        currentState = self._prop.propagate(self._extrap_Date.shiftedBy(self.stepT))
+        try:
+            currentState = self._prop.propagate(self._extrap_Date, self._extrap_Date.shiftedBy(float(self.stepT)))
+        except: 
+            print('orekit error')
+            state_1 = [(self._currentOrbit.getA()) / self.r_target_state[0],
+                   self._currentOrbit.getEquinoctialEx(), self._currentOrbit.getEquinoctialEy(),
+                   self._currentOrbit.getHx(), self._currentOrbit.getHy(),
+                   self._currentOrbit.getADot(), self._currentOrbit.getEquinoctialExDot(),
+                   self._currentOrbit.getEquinoctialEyDot(),
+                   self._currentOrbit.getHxDot(), self._currentOrbit.getHyDot()
+                   ]
+            return state_1, -1, True, {}
 
         self.curr_fuel_mass = currentState.getMass() - self.dry_mass
         self._currentDate = currentState.getDate()
@@ -501,8 +526,8 @@ class OrekitEnv(gym.Env):
         self.omega_orbit.append(k_orbit.getRightAscensionOfAscendingNode())
         self.v_orbit.append(k_orbit.getTrueAnomaly())
 
-        self.actions.append(thrust)
-        self.thrust_mags.append(thrust_mag)
+        self.actions.append(vel)
+        # self.thrust_mags.append(thrust_mag)
 
         self.adot_orbit.append(self._currentOrbit.getADot())
         self.exdot_orbit.append(self._currentOrbit.getEquinoctialExDot())
