@@ -24,7 +24,7 @@
 # *****************************************************************************
 
 from testing.env_test import checkPackageVersion, testEnvironment
-from training import train_model, load_model, predict
+from training import train_model, load_model, predict, retrain_model
 
 testEnvironment()
 
@@ -61,9 +61,11 @@ thrust_type = "discrete"
 
 
 if user_train_predict_in == "1":
-    model = load_model('PPO', 'models/97164_PPO_model')
+    model = load_model('PPO', 'models/17520_PPO_model')
     predict(model, initial_state, target_state, simulation_date,
                 simulation_duration, spacecraft_mass, simulation_stepT, visualize, action_space, thrust_type)
+elif user_train_predict_in == "3":
+    retrain_model('PPO', initial_state, target_state, simulation_date, simulation_duration, spacecraft_mass, simulation_stepT, visualize, action_space, thrust_type)
 else:
     train_model("PPO", initial_state, target_state, simulation_date,
                 simulation_duration, spacecraft_mass, simulation_stepT, visualize, action_space, thrust_type)
