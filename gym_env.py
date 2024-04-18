@@ -950,10 +950,10 @@ class OrekitEnv(gym.Env):
                 reward = -10000000
             done = True
 
-        elif curr_dist_value > initial_dist_value * 20:
-            print('\nToo far from target')
-            reward = -1000
-            done = True
+        # elif curr_dist_value > initial_dist_value * 20:
+        #     print('\nToo far from target')
+        #     reward = -1000
+        #     done = True
 
         self.total_reward += reward
 
