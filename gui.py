@@ -38,6 +38,7 @@ def relative_to_assets(path: str) -> Path:
 
 # Initialize the subprocess variable to None
 process = None
+output_file = "output.txt"
 
 def toggle_script():
     global process
@@ -46,7 +47,8 @@ def toggle_script():
         # Update the button to say "Kill Script"
         button_9.config(image=button_image_kill)
         # Start the external script and keep its process
-        process = subprocess.Popen(["python","main.py"])
+        with open(output_file, "a") as output:
+            process = subprocess.Popen(["python","display_output.py"],stdout=output, stderr=subprocess.STDOUT)
         button_9['command'] = kill_script
 
 def kill_script():
