@@ -1,0 +1,25 @@
+All requirements satisfied!
+Enter Which Dataset to Use: LINES:  ['1\n', 'keplerian\n', 'initial, 5500*1e3, 0.20, 5.0, 20.0, 20.0, 10.0\n', 'final, 6300*1e3, 0.23, 5.3, 24.0, 24.0, 10.0\n', 'results, 24.0*60.0**2*4, 0, 0\n', 'date, 2019, 2, 16, 12, 10, 0.0\n', 'mass, 500.0, 150.0\n', '\n', '2\n', 'keplerian\n', 'initial, 5500*1e3, 0.20, 5.0, 20.0, 20.0, 10.0\n', 'final, 6300*1e3, 0.23, 5.3, 24.0, 24.0, 10.0\n', 'results, 24.0*60.0**2*4, 0, 0\n', 'date, 2025, 2, 16, 12, 10, 0.0\n', 'mass, 500.0, 150.0']
+All requirements satisfied!
+Using cpu device
+C:\Users\jmate\anaconda3\Lib\site-packages\stable_baselines3\common\vec_env\patch_gym.py:49: UserWarning: You provided an OpenAI Gym environment. We strongly recommend transitioning to Gymnasium environments. Stable-Baselines3 is automatically wrapping your environments in a compatibility layer, which could potentially cause issues.
+  warnings.warn(
+Wrapping the env with a `Monitor` wrapper
+Wrapping the env in a DummyVecEnv.
+RESET:  0
+Out of time
+RESET:  -120.4961153874254
+Out of time
+RESET:  -143.63162811404246
+C:\Users\jmate\anaconda3\Lib\site-packages\stable_baselines3\common\vec_env\patch_gym.py:49: UserWarning: You provided an OpenAI Gym environment. We strongly recommend transitioning to Gymnasium environments. Stable-Baselines3 is automatically wrapping your environments in a compatibility layer, which could potentially cause issues.
+  warnings.warn(
+C:\Users\jmate\anaconda3\Lib\site-packages\stable_baselines3\common\vec_env\patch_gym.py:49: UserWarning: You provided an OpenAI Gym environment. We strongly recommend transitioning to Gymnasium environments. Stable-Baselines3 is automatically wrapping your environments in a compatibility layer, which could potentially cause issues.
+  warnings.warn(
+C:\Users\jmate\anaconda3\Lib\site-packages\stable_baselines3\common\vec_env\patch_gym.py:49: UserWarning: You provided an OpenAI Gym environment. We strongly recommend transitioning to Gymnasium environments. Stable-Baselines3 is automatically wrapping your environments in a compatibility layer, which could potentially cause issues.
+  warnings.warn(
+C:\Users\jmate\anaconda3\Lib\site-packages\stable_baselines3\common\vec_env\patch_gym.py:49: UserWarning: You provided an OpenAI Gym environment. We strongly recommend transitioning to Gymnasium environments. Stable-Baselines3 is automatically wrapping your environments in a compatibility layer, which could potentially cause issues.
+  warnings.warn(
+C:\Users\jmate\anaconda3\Lib\site-packages\stable_baselines3\common\vec_env\patch_gym.py:49: UserWarning: You provided an OpenAI Gym environment. We strongly recommend transitioning to Gymnasium environments. Stable-Baselines3 is automatically wrapping your environments in a compatibility layer, which could potentially cause issues.
+  warnings.warn(
+C:\Users\jmate\anaconda3\Lib\site-packages\stable_baselines3\common\vec_env\patch_gym.py:49: UserWarning: You provided an OpenAI Gym environment. We strongly recommend transitioning to Gymnasium environments. Stable-Baselines3 is automatically wrapping your environments in a compatibility layer, which could potentially cause issues.
+  warnings.warn(
