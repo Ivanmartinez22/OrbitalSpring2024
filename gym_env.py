@@ -100,9 +100,6 @@ ax_lims = 7000000
 global asymtote_limit
 asymtote_limit = 0.99
 
-
-
-
 orb = pyorb.Orbit(
     M0 = 1.0,
     G = pyorb.get_G(length='AU', mass='Msol', time='y'),
@@ -119,7 +116,6 @@ orb = pyorb.Orbit(
 # for some optimization
 orb.direct_update = False
 
-
 target = pyorb.Orbit(
     M0 = 1.0,
     G = pyorb.get_G(length='AU', mass='Msol', time='y'),
@@ -134,112 +130,69 @@ target = pyorb.Orbit(
     type = 'true',
 )
 
-
-
-
 r = orb.r
-
-
-
-
-
-
 l, = ax.plot(r[0, :], r[1, :], r[2, :], '-g', label='Current State') #training orbits
-
-
 fin, = ax.plot(r[0, :], r[1, :], r[2, :], '-r', label='Target State')
-
-
 dot, = ax.plot([r[0, 0]], [r[1, 0]], [r[2, 0]], 'ob') # Current orbit
+
 global vel
 vel = add_vel(ax)
 ax.plot([0], [0], [0], 'og', label='Earth')
 plt.legend(loc="upper left")
 
-
 # Display Sliders
 axr_b = fig.add_axes([0.05, 0.10, 0.05, 0.02])
 r_b = Button(axr_b, 'Reset')
-
-
-
-
-
 
 ax.set_title('Orbit', fontsize=22)
 ax.set_xlabel('X-position [m]', fontsize=15, labelpad=20)
 ax.set_ylabel('Y-position [m]', fontsize=15, labelpad=20)
 ax.set_zlabel('Z-position [m]', fontsize=15, labelpad=20)
-
-
 ax.set_xlim([-ax_lims, ax_lims])
 ax.set_ylim([-ax_lims, ax_lims])
 ax.set_zlim([-ax_lims, ax_lims])
-
 
 axcolor = 'lightgoldenrodyellow'
 ax_a = plt.axes([0.25, 0.05, 0.2, 0.03], facecolor=axcolor)
 ax_e = plt.axes([0.25, 0.1, 0.2, 0.03], facecolor=axcolor)
 ax_i = plt.axes([0.25, 0.15, 0.2, 0.03], facecolor=axcolor)
-
-
 ax_omega = plt.axes([0.6, 0.05, 0.2, 0.03], facecolor=axcolor)
 ax_Omega = plt.axes([0.6, 0.1, 0.2, 0.03], facecolor=axcolor)
 ax_nu = plt.axes([0.6, 0.15, 0.2, 0.03], facecolor=axcolor)
-
 
 s_a = Slider(ax_a, 'a [m]', 5400*1e3, 6400*1e3, valinit=1)
 s_e = Slider(ax_e, 'e [1]', 0, 1, valinit=0)
 # s_e.is_hyp = False
 s_i = Slider(ax_i, 'i [deg]', 4, 6, valinit=0)
 
-
 s_omega = Slider(ax_omega, 'omega [deg]', 0, 40, valinit=0)
 s_Omega = Slider(ax_Omega, 'Omega [deg]', 0, 40, valinit=0)
 s_nu = Slider(ax_nu, 'nu [deg]', -180, 180, valinit=0)
 
 
-
-
-
-
-
-
 #functions
-
-
-
-
-
 
 def draw():
     r = orb.r
     t = target.r
 
-
     l.set_xdata(r[0, 1:])
     l.set_ydata(r[1, 1:])
     l.set_3d_properties(r[2, 1:])
-
 
     dot.set_xdata([r[0, 0]])
     dot.set_ydata([r[1, 0]])
     dot.set_3d_properties([r[2, 0]])
 
-
     fin.set_xdata(t[0, 1:])
     fin.set_ydata(t[1, 1:])
     fin.set_3d_properties(t[2, 1:])
-
 
     global vel
     vel.remove()
     vel = add_vel(ax)
 
-
     fig.canvas.draw_idle()
-
-
 
 
 def update_orb(val):
@@ -253,31 +206,15 @@ def update_orb(val):
     draw()
 
 
-
-
 def update_sat(a, e, i, omega, Omega, nu):
-   
-   
-
-
-   
-
 
     def set_state(event, source):
         if source == 'Reset':
             current_state()
 
-
     r_b.on_clicked(lambda x: set_state(x, 'Reset'))
    
-
-
     def current_state():
-       
-        # time.sleep(1)
-        # Iterate through each state
-
-
         update_orb([a, e, i, omega, Omega, nu])
         s_a.set_val(a)
         s_e.set_val(e)
@@ -289,6 +226,7 @@ def update_sat(a, e, i, omega, Omega, nu):
 
 
     current_state()
+
 
 # Loads orekit-data.zip from current directory
 setup_orekit_curdir()
@@ -329,22 +267,6 @@ class OrekitEnv(gym.Env):
         live_viz: show live visualizer while training (boolean)
         """
 
-        """
-        (this was preexisting but did not match any of the actual parameters)
-        initializes the orekit VM and included libraries
-        Params:
-        _prop: The propagation object
-        _initial_date: The initial start date of the propagation
-        _orbit: The orbit type (Keplerian, Circular, etc...)
-        _currentDate: The current date during propagation
-        _currentOrbit: The current orbit paramenters
-        _px: spacecraft position in the x-direction
-        _py: spacecraft position in the y-direction
-        _sc_fuel: The spacecraft with fuel accounted for
-        _extrap_Date: changing date during propagation state
-        _sc_state: The spacecraft without fuel
-        """
-
         super(OrekitEnv, self).__init__()
         # ID for reward/state output files (Can create better system)
         self.id = random.randint(1,100000)
@@ -364,9 +286,9 @@ class OrekitEnv(gym.Env):
         self.a_orbit = [] # semimajor axis
         self.ex_orbit = [] # eccentricity x
         self.ey_orbit = [] # eccentricity y
-        self.hx_orbit = [] # angular momentum x
-        self.hy_orbit = [] # angular momentum y
-        self.lv_orbit = [] # true longitude and latitude
+        self.hx_orbit = [] # inclination vector x
+        self.hy_orbit = [] # inclination vector y
+        self.lv_orbit = [] # mean anomaly
 
         # rate of change of state params at each time step
         self.adot_orbit = []
@@ -394,11 +316,11 @@ class OrekitEnv(gym.Env):
         #List of actions and thrust magnitudes
         self.actions = []
         self.thrust_mags = []
-        self.n_actions = 0
-        self.consecutive_actions = 0
-        self.curr_dist = 0
-        self.n_hits = 0
-        self.initial_dist = 0
+        self.n_hits = 0 # number of times agent has hit target during training
+
+        self.n_actions = 0 # number of actions taken during episode
+        self.curr_dist = 0 # current distance from target
+        self.initial_dist = 0 # initial distance from target
 
         # Fuel params
         self.dry_mass = mass[0]
@@ -436,30 +358,17 @@ class OrekitEnv(gym.Env):
         self.duration = duration
         self.live_viz = live_viz
 
-        # OpenAI API to define 3D continous action space vector [a,b,c]
-        # Velocity in the following directions:
-            # radial: line formed from center of earth to satellite, 
-            # tangential: facing in the direction of movement perpendicular to radial
-            # normal: perpendicular to orbit plane
-        # self.action_space = spaces.Box(
-        #     low=-1,
-        #     high=1,
-        #     shape=(3,),
-        #     dtype=np.float32
-        # )
-
         # new discrete action space
+        # future work: allow user to change max thrust value and increment size
         self.thrust_values = [-100, -75, -50, -25, 0, 25, 50, 75, 100]
         self.action_space = spaces.MultiDiscrete([len(self.thrust_values)] * 3)
 
 
-        # self.observation_space = 10  # states | Equinoctial components + derivatives
-        #   changing to 18: 6 for current equinoctial components, 6 for current derivatives, 5 for target equinoctial components (minus lv), 1 for n_actions
+        # self.observation_space = 18: 6 for current equinoctial components, 6 for current derivatives, 5 for target equinoctial components (minus lv), 1 for n_actions
         # OpenAI API
         # state params + derivatives (could include target in future)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf,shape=(18,),
                                         dtype=np.float32)
-        self.action_bound = 0.6  # Max thrust limit
         self._isp = 3100.0 
 
         # set self.r_target_state and self.r_initial_state with data from _targetOrbit and _orbit (convert from KeplerianOrbit to np.array of equinoctial components)
@@ -467,9 +376,7 @@ class OrekitEnv(gym.Env):
         self.r_target_state = self.get_state(self._targetOrbit)
         self.r_initial_state = self.get_state(self.initial_orbit)
         
-        #visulizer plot variables 
-        # self.fig = plt.figure(figsize=(15, 15))
-        # self.ax = self.fig.add_subplot(111, projection='3d')
+        # visulizer plot variables 
         if self.live_viz is True:
             plt.ion()
 
@@ -500,7 +407,7 @@ class OrekitEnv(gym.Env):
          Crate the initial orbit using Keplarian elements
         :param state: a state list [a, e, i, omega, raan, lM]
         :param date: A date given as an orekit absolute date object
-        :return:
+        :return: KeplerianOrbit object
         """
         a, e, i, omega, raan, lM = state # get keplerian coordinates
 
@@ -588,11 +495,12 @@ class OrekitEnv(gym.Env):
         gravityProvider = GravityFieldFactory.getNormalizedProvider(8, 8)
         self._prop.addForceModel(HolmesFeatherstoneAttractionModel(earth.getBodyFrame(), gravityProvider))
 
+
     # required for Gym Env, called when new episode starts
     def reset(self):
         """
         Resets the orekit enviornment
-        :return:
+        :return: new initial state (np.array)
         """
 
         print("RESET")
@@ -607,7 +515,6 @@ class OrekitEnv(gym.Env):
         self._currentOrbit = None
 
         self.n_actions = 0
-        self.consecutive_actions = 0
         self.steps = 0
 
         # Randomizes the initial orbit (initial state +- random variable)
@@ -683,6 +590,7 @@ class OrekitEnv(gym.Env):
         
         return state
 
+
     @property
     def getTotalMass(self):
         """
@@ -695,6 +603,10 @@ class OrekitEnv(gym.Env):
     # return state as list from orbit object
     # used by the model as input for NN (must match observation space dimensions)
     def get_state(self, orbit, with_derivatives=True):
+        """
+        Get the state of the spacecraft spacecraft in equinoctial coordinates
+        :return: orbital parameters describing current state, target state, fuel (np.array)
+        """
         # basic equinoctial components
         state = [orbit.getA(), orbit.getEquinoctialEx(), orbit.getEquinoctialEy(),
                        orbit.getHx(), orbit.getHy(), orbit.getLv()] 
@@ -715,6 +627,10 @@ class OrekitEnv(gym.Env):
     # gets the state with the current and target position and velocities in each direction + fuel mass
     # 18 dimensions
     def get_state_keplerian(self, orbit):
+        """
+        Get the state of the spacecraft spacecraft in Keplerian coordinates
+        :return: orbital parameters describing current state, target state, fuel (np.array)
+        """
         orbit = self.convert_to_keplerian(orbit)
         target = self.convert_to_keplerian(self._targetOrbit)
         return [ orbit.getA(), orbit.getE(), orbit.getI(), orbit.getPerigeeArgument(), orbit.getRightAscensionOfAscendingNode(), orbit.getTrueAnomaly(),
@@ -735,18 +651,13 @@ class OrekitEnv(gym.Env):
         self.prev_fuel = self.curr_fuel_mass
         self.did_action = False
 
+        # compute thrust value from input
         compute_thrust_val = lambda x: float(self.thrust_values[x])
         input = list(map(compute_thrust_val, input))
         vel = Vector3D(*input)
 
         if(any(input)):
-            self.consecutive_actions += 1
             self.did_action = True
-            self.n_actions += 1
-        else:
-            self.consecutive_actions = 0
-
-        if(any(input)):
             self.n_actions += 1
 
         # Remove previous event detectors
@@ -806,18 +717,12 @@ class OrekitEnv(gym.Env):
         state = self.get_state(self._currentOrbit)
         info = {} # OpenAI debug option
         
+        # visualize
         if self.live_viz is True:
             update_sat((self.a_orbit[-1]-EARTH_RADIUS),self.e_orbit[-1],degrees(self.i_orbit[-1]),degrees(self.w_orbit[-1]),degrees(self.omega_orbit[-1]),degrees(self.v_orbit[-1]))
 
         return np.array(state), reward, done, info
     
-
-    # compute the difference between 2 angles
-    def angle_diff(self, angle1, angle2):
-        diff = angle2 - angle1
-        diff = (diff + pi) % (2 * pi) - pi
-        return diff
-
 
     def dist_reward(self, action):
         """
@@ -827,17 +732,9 @@ class OrekitEnv(gym.Env):
         done = False
 
         curr_state = self.get_state(self._currentOrbit)
-        curr_velocity = curr_state[6:12]
-        prev_state = self.get_state(self._prevOrbit, with_derivatives=False)
         initial_state = self.get_state(self.initial_orbit)
 
-        # prev_k = self.convert_to_keplerian(self._prevOrbit)
-        # curr_k = self.convert_to_keplerian(self._currentOrbit)
-        # start_k = self.convert_to_keplerian(self.initial_orbit)
-        # target_k = self.convert_to_keplerian(self._targetOrbit)
-
         curr_dist = np.zeros(5)
-        prev_dist = np.zeros(5)
         initial_dist = np.zeros(5)
 
         curr_dist[0] = abs(self.r_target_state[0] - curr_state[0]) / self.r_target_state[0]
@@ -848,65 +745,17 @@ class OrekitEnv(gym.Env):
         curr_dist_value = np.sum(curr_dist)
         self.curr_dist = curr_dist_value
 
-        prev_dist[0] = abs(self.r_target_state[0] - prev_state[0]) / self.r_target_state[0]
-        prev_dist[1] = abs(self.r_target_state[1] - prev_state[1]) / self.r_target_state[1]
-        prev_dist[2] = abs(self.r_target_state[2] - prev_state[2]) / self.r_target_state[2]
-        prev_dist[3] = abs(self.r_target_state[3] - prev_state[3]) / self.r_target_state[3]
-        prev_dist[4] = abs(self.r_target_state[4] - prev_state[4]) / self.r_target_state[4]
-        prev_dist_value = np.sum(prev_dist)
-
         initial_dist[0] = abs(self.r_target_state[0] - initial_state[0]) / self.r_target_state[0]
         initial_dist[1] = abs(self.r_target_state[1] - initial_state[1]) / self.r_target_state[1]
         initial_dist[2] = abs(self.r_target_state[2] - initial_state[2]) / self.r_target_state[2]
         initial_dist[3] = abs(self.r_target_state[3] - initial_state[3]) / self.r_target_state[3]
         initial_dist[4] = abs(self.r_target_state[4] - initial_state[4]) / self.r_target_state[4]
         initial_dist_value = np.sum(initial_dist)
-
         self.initial_dist = initial_dist_value
 
 
-        curr_velocity_mag = np.linalg.norm(curr_velocity)
-        curr_velocity_mag = 1 if curr_velocity_mag < 1 else curr_velocity_mag # only scale if velocity mag >= 1
-
-        # positive = current state closer to target than previous
-        # scaled by current velocity magnitude so it doesnt get big rewards for going fast
-        # might replace with a constant value if its closer
-        distance_change = (prev_dist_value - curr_dist_value) / curr_velocity_mag 
-        distance_change_constant = 0.1 if distance_change > 0 else -0.1
-
-        # penalize having lower altitude than both the target and initial state (hopefully will discourage crashing into)
-
-        a_penalty = curr_state[0] - 1000000 + EARTH_RADIUS # positive = A is greater than min altitude (1000 km)
-        a_penalty = 0 if a_penalty > 0 else a_penalty * 100
-
-        fuel_consumed = self.prev_fuel - self.curr_fuel_mass
-        total_fuel_consumed = self.fuel_mass - self.curr_fuel_mass
-        consecutive_action_penalty = self.consecutive_actions * -10 if self.consecutive_actions > 5 else 0
-        action_penalty = 0.1 if self.did_action else 0
-        initial_difference = initial_dist_value - curr_dist_value # positive value = closer than initial
-        initial_difference = 0 if initial_difference < 0 else initial_difference # dont penalize being further
-
-        # shifted_curr_dist = -(curr_dist_value - initial_dist_value)**3 - initial_dist_value**3 # originally wasnt shifted down
-        distance_penalty = -10 * curr_dist_value if curr_dist_value <= initial_dist_value else -1/10 *  (curr_dist_value-initial_dist_value) - 10*initial_dist_value
-        # -10 * curr if curr < initial else -1/10 *  (curr-initial) - 10*initial
-
-
-        # reward = -1 * 10*curr_dist_value + 5*distance_change - 0.1*fuel_consumed - a_penalty**2 + consecutive_action_penalty
-        # reward = -curr_dist_value - fuel_consumed
-        # reward = -curr_dist_value + distance_change_constant - a_penalty - action_penalty
-        # reward = -curr_dist_value + initial_difference*10 - a_penalty - action_penalty # more reward for going slow (more accumulated reward)
-        # reward = shifted_curr_dist - a_penalty
         reward = -curr_dist_value
-        # print('distance reward:', curr_dist_value)
-        # print('distance change:', distance_change)
-        # print('a penalty:', a_penalty)
-        # print('action penalty:', action_penalty)
 
-        # print(distance_change_reward)
-        # print(curr_dist_value)
-
-        # reward = -(reward_a + reward_hx*10 + reward_hy*10 + reward_ex + reward_ey) * self.n_actions
-        # print(reward)
 
         # TERMINAL STATES
         # Target state (with tolerance)
@@ -931,7 +780,6 @@ class OrekitEnv(gym.Env):
         elif self.curr_fuel_mass <= 0:
             print('\nRan out of fuel')
             print('Distance:', curr_dist_value)
-            reward = -total_fuel_consumed
             done = True
 
         # Crash into Earth
@@ -945,15 +793,9 @@ class OrekitEnv(gym.Env):
         elif self._extrap_Date.compareTo(self.final_date) >= 0:
             print("\nOut of time")
             print('Distance:', curr_dist_value)
-            reward = -total_fuel_consumed
             if self.n_actions == 0: # penalize doing nothing
                 reward = -10000000
             done = True
-
-        # elif curr_dist_value > initial_dist_value * 20:
-        #     print('\nToo far from target')
-        #     reward = -1000
-        #     done = True
 
         self.total_reward += reward
 
@@ -961,7 +803,6 @@ class OrekitEnv(gym.Env):
     
 
     # State/Action Output files
-
     def write_state(self, distance):
         # State file (Equinoctial)
         with open("results/state/"+str(self.id)+"_"+self.alg+"_state_equinoctial_"+str(self.episode_num)+".txt", "w") as f:

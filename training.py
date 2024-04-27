@@ -69,7 +69,6 @@ def train_model(alg, initial_state, target_state, simulation_date,
    # Get action space from environment
    n_actions = env.action_space.shape[-1]
    # Define the action noise (continuous action space)
-   # action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.3 * np.ones(n_actions))
    policy_kwargs = dict(net_arch=[128, 128])
 
@@ -86,12 +85,7 @@ def train_model(alg, initial_state, target_state, simulation_date,
 
    env.alg = alg
 
-   # Options for loading existing model
-   # model = DDPG.load("ddpg_model", device="cpu")
-   # model.set_env(env)
-
    # Train & save model
-   # 415000
    model.learn(total_timesteps=400000, log_interval=10)
    model.save('models/'+str(env.id)+"_"+ alg +"_model")
 

@@ -41,21 +41,10 @@ spacecraft_mass = [500.0, 150.0]
 simulation_stepT = 500.0
 visualize = True
 
-folder = 'models'
-files = os.listdir(folder)
-for file in files:
-    path = os.path.join(folder, file)
-    print(file)
-    try:
-        model = load_model('PPO', path)
-        predict(model, initial_state, target_state, simulation_date, 
-                simulation_duration, spacecraft_mass, simulation_stepT, visualize)
-    except:
-        print('skipping')
 
-# model = load_model('PPO', 'models/final_with_too_far_67880_model')
-# predict(model, initial_state, target_state, simulation_date, 
-#             simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+model = load_model('PPO', 'models/final_model')
+predict(model, initial_state, target_state, simulation_date, 
+            simulation_duration, spacecraft_mass, simulation_stepT, visualize)
 
 # train_model("PPO", initial_state, target_state, simulation_date, 
-#             simulation_duration, spacecraft_mass, simulation_stepT, False)
+#             simulation_duration, spacecraft_mass, simulation_stepT, visualize)
