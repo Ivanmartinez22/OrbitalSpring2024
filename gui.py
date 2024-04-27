@@ -1071,7 +1071,7 @@ button_8 = Button(
     image=button_image_8,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: export_to_csv(),
+    #command=lambda: export_to_csv(),
     relief="flat"
 )
 button_8.place(

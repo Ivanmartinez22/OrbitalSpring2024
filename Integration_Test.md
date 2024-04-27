@@ -38,6 +38,12 @@
 ## Analysis Execution (main.py)
 - Define initial state, target state, simulation_date, simulation_duration, spacecraft_mass, and simulation_stepT
 - Run **main.py** by passing in either **DDPG** or **TD3** to the **stationkeeping** function
+   ## GUI usage (gui.py)
+   - To use the GUI, run **gui.py**
+   - While in the GUI, you can edit the values of the attributes to run the program based on your own values
+   - To run the program, press **run** and the program will begin to execute in a new window that displays the command line output
+         - To see the full output, you must answer the prompts for the live visuzalier and choose training/predict in the command line
+         - To see the visualizer, press **visualize** to see the original visualizer run within the GUI window
 
 ## Results
 - Successful termination states during training are found in the **results** directory
