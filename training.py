@@ -56,7 +56,6 @@ def predict(model, initial_state, target_state, simulation_date,
    while not done:
       action, _ = model.predict(state)
       state, reward, done, info = env.step(action)
-      print(done)
       print(action)
    
    
@@ -70,27 +69,24 @@ def train_model(alg, initial_state, target_state, simulation_date,
    # Get action space from environment
    n_actions = env.action_space.shape[-1]
    # Define the action noise (continuous action space)
-   action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+   action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.3 * np.ones(n_actions))
+   policy_kwargs = dict(net_arch=[128, 128])
 
    if(alg == "DDPG"):
       # Create the TD3 model
       model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01, train_freq=(1, 'episode'))
    elif(alg == "TD3"):
-      model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01)
+      model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01, policy_delay=5)
    elif alg == 'PPO':
-      model = PPO('MlpPolicy', env, device='auto')
+      model = PPO('MlpPolicy', env, device='auto', gamma=0.99, policy_kwargs=policy_kwargs)
    else:
       print("Unknown model, check again and run")
       sys.exit()
 
    env.alg = alg
 
-   # Options for loading existing model
-   # model = DDPG.load("ddpg_model", device="cpu")
-   # model.set_env(env)
-
    # Train & save model
-   model.learn(total_timesteps=415000, log_interval=10)
+   model.learn(total_timesteps=400000, log_interval=10)
    model.save('models/'+str(env.id)+"_"+ alg +"_model")
 
    # Generate .txt of reward/episode trained

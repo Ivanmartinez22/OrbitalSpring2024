@@ -25,18 +25,23 @@
 
 from testing.env_test import checkPackageVersion, testEnvironment
 from training import train_model, load_model, predict
+import os
+
 
 testEnvironment()
 
 # Page 35 RP(A Reinforcement Learning Approach to Spacecraft Trajectory);
 # [a(m), e, i(deg), omega/w(deg), Omega/raan(deg), TrueAnomaly(v)]
-initial_state = [5500*1e3, 0.20,5.0, 20.0, 20.0, 10.0]
-target_state = [6300*1e3, 0.23, 5.3, 24.0, 24.0, 10.0]
+initial_state = [5500*1e3, 0.20, 5.0, 20.0, 20.0, 10.0]
+target_state = [5800*1e3, 0.21, 5.1, 20.5, 20.5, 10.0]
+# target_state = [6300*1e3, 0.23, 5.3, 24.0, 24.0, 10.0]
 simulation_date = [2018, 2, 16, 12, 10, 0.0]
 simulation_duration = 24.0 * 60.0 ** 2 * 4
 spacecraft_mass = [500.0, 150.0]
 # Let Spacecraft take an action every (step) amount of seconds
 simulation_stepT = 500.0
+visualize = True
+
 
 user_viz_in = input("Turn on Live visualizer for predictions and training (y/n): ")
 user_train_predict_in = input("Enter 1 for predict, Enter 2 for training: ")
@@ -45,9 +50,9 @@ if user_viz_in == "y":
     visualize = True
 
 if user_train_predict_in == "1":
-    model = load_model('PPO', 'models/97164_PPO_model')
+    model = load_model('PPO', 'models/final_model')
     predict(model, initial_state, target_state, simulation_date, 
                 simulation_duration, spacecraft_mass, simulation_stepT, visualize)
 else:
-    train_model("TD3", initial_state, target_state, simulation_date, 
+    train_model("PPO", initial_state, target_state, simulation_date, 
                 simulation_duration, spacecraft_mass, simulation_stepT, visualize)
