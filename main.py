@@ -27,6 +27,7 @@ from testing.env_test import checkPackageVersion, testEnvironment
 from training import train_model, load_model, predict
 import os
 
+
 testEnvironment()
 
 # Page 35 RP(A Reinforcement Learning Approach to Spacecraft Trajectory);
@@ -42,9 +43,16 @@ simulation_stepT = 500.0
 visualize = True
 
 
-model = load_model('PPO', 'models/final_model')
-predict(model, initial_state, target_state, simulation_date, 
-            simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+user_viz_in = input("Turn on Live visualizer for predictions and training (y/n): ")
+user_train_predict_in = input("Enter 1 for predict, Enter 2 for training: ")
+visualize = False
+if user_viz_in == "y":
+    visualize = True
 
-# train_model("PPO", initial_state, target_state, simulation_date, 
-#             simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+if user_train_predict_in == "1":
+    model = load_model('PPO', 'models/final_model')
+    predict(model, initial_state, target_state, simulation_date, 
+                simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+else:
+    train_model("PPO", initial_state, target_state, simulation_date, 
+                simulation_duration, spacecraft_mass, simulation_stepT, visualize)
