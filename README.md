@@ -25,6 +25,8 @@ Twin Delayed Deep Deterministic Policy Gradient (TD3)
 
 Opportunities to further improve this tool include the implementation of a more complex maneuvers and actions, shifting from a continuous to a discrete action space, and having the RL agent be able to accomodate for either a multi-agent training situation or a dynamic goal state
 
+GUI could have the newer features from main integrated into it such as retraining existing models. 
+
 ## Contributions and Acknowledgments
 
 This tool was initially developed by Texas A&M University Computer Science students, as part of L3Harris' Capstone partnership with Texas A&M University, as facilitated through the Mission Analysis Group (MAG). Underlying research and comparison work was drawn from the following paper: *A Reinforcement Learning Approach to Spacecraft Trajectory Optimization, [Daniel S. Kolosa](https://github.com/dkolosa/Satmind).*
