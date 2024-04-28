@@ -42,6 +42,24 @@ spacecraft_mass = [500.0, 150.0]
 simulation_stepT = 500.0
 visualize = True
 
+print("""
+
+Live Visualization Options:
+- Type 'y' to turn on live visualizer for predictions and training.
+- Type 'n' to disable live visualization.
+      
+Options:
+1. Predict with an existing model
+2. Train a new model
+3. Retrain an existing model
+
+To select an option, enter the corresponding number in the command line:
+
+Example Usage:
+Turn on Live visualizer for predictions and training (y/n): y
+Enter 1 for predict, Enter 2 for training, Enter 3 for retraining existing model: 2
+Enter algorithm: PPO, TD3, DDPG: PPO
+""")
 
 user_viz_in = input("Turn on Live visualizer for predictions and training (y/n): ")
 user_train_predict_in = input("Enter 1 for predict, Enter 2 for training, Enter 3 for retraining existing model: ")
