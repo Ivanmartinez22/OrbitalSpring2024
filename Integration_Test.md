@@ -37,7 +37,7 @@
 
 ## Analysis Execution (main.py)
 - Define initial state, target state, simulation_date, simulation_duration, spacecraft_mass, and simulation_stepT
-- Run **main.py** by passing in either **DDPG** or **TD3** to the **stationkeeping** function
+- Run **main.py** and it will prompt you for the options you would like to select
    ## GUI usage (gui.py)
    - To use the GUI, run **gui.py**
    - While in the GUI, you can edit the values of the attributes to run the program based on your own values
@@ -50,9 +50,6 @@
 - A zip of the trained model will appear in the **models** directory
 - Change **line 39** of **visual_orbit.py** to whatever file within the *results/state* folder you want to visualize
 - Run **visual_orbit.py**
-
-## Execution facts so far 
-- Runs very slow I have not been able to see end of execution 
 
 ## References
 
