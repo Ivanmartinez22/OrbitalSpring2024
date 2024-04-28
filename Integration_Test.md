@@ -42,7 +42,9 @@
    - To use the GUI, run **gui.py**
    - While in the GUI, you can edit the values of the attributes to run the program based on your own values
    - To run the program, press **run** and the program will begin to execute in a new window that displays the command line output
-         - To see the full output, you must answer the prompts for the live visuzalier and choose training/predict in the command line
+         - To see the full output, you must answer the prompts for live visualizer, training, etc. in the command line after pressing **run**
+         - Because of how the GUI works, you must know what options you are going to choose before hand
+            - To see the options, look at **main.py**
          - To see the visualizer, press **visualize** to see the original visualizer run within the GUI window
 
 ## Results
