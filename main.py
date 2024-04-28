@@ -24,7 +24,7 @@
 # *****************************************************************************
 
 from testing.env_test import checkPackageVersion, testEnvironment
-from training import train_model, load_model, predict
+from training import train_model, load_model, predict, retrain_model
 import os
 
 
@@ -44,15 +44,24 @@ visualize = True
 
 
 user_viz_in = input("Turn on Live visualizer for predictions and training (y/n): ")
-user_train_predict_in = input("Enter 1 for predict, Enter 2 for training: ")
+user_train_predict_in = input("Enter 1 for predict, Enter 2 for training, Enter 3 for retraining existing model: ")
 visualize = False
 if user_viz_in == "y":
     visualize = True
 
 if user_train_predict_in == "1":
-    model = load_model('PPO', 'models/final_model')
+    alg = input("Enter algorithm: PPO, TD3, DDPG: ")
+    model_name_input = input("Enter model name: ")
+    model_name = "models/" + model_name_input
+    model = load_model(alg, model_name)
     predict(model, initial_state, target_state, simulation_date, 
                 simulation_duration, spacecraft_mass, simulation_stepT, visualize)
-else:
-    train_model("PPO", initial_state, target_state, simulation_date, 
+elif user_train_predict_in == "3":
+    alg = input("Enter algorithm: PPO, TD3, DDPG: ")
+    model_name_input = input("Enter input model name: ")
+    export_model_name_input = input("Enter export model name: ")
+    retrain_model(alg, initial_state, target_state, simulation_date, simulation_duration, spacecraft_mass, simulation_stepT, visualize, model_name_input, export_model_name_input)
+elif user_train_predict_in == "2":
+    alg = input("Enter algorithm: PPO, TD3, DDPG: ")
+    train_model(alg, initial_state, target_state, simulation_date, 
                 simulation_duration, spacecraft_mass, simulation_stepT, visualize)

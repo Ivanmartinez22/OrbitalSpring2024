@@ -91,3 +91,45 @@ def train_model(alg, initial_state, target_state, simulation_date,
 
    # Generate .txt of reward/episode trained
    env.write_reward()
+   
+#retrain model function allows a model to be retrained for more steps or under a new environment so long as the environment is compatible with the model
+#when training different id number will be printed reward txt will have different id number
+def retrain_model(alg, initial_state, target_state, simulation_date, 
+                simulation_duration, spacecraft_mass, simulation_stepT, visualize, import_model_name, export_model_name):
+
+   # Create environment instance
+   env = OrekitEnv(initial_state, target_state, simulation_date, 
+                   simulation_duration, spacecraft_mass, simulation_stepT, visualize)
+   # Get action space from environment
+   n_actions = env.action_space.shape[-1]
+   # Define the action noise (continuous action space)
+   action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+
+   if(alg == "DDPG"):
+      # Create the TD3 model
+      model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01, train_freq=(1, 'episode'))
+   elif(alg == "TD3"):
+      model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, device="auto", tau=0.01)
+   elif alg == 'PPO':
+      model = PPO('MlpPolicy', env, device='auto')
+   else:
+      print("Unknown model, check again and run")
+      sys.exit()
+
+   env.alg = alg
+
+   # Options for loading existing model
+ 
+   # Train & save model  
+   model_name = "models/" + import_model_name
+   model = load_model(alg, model_name)
+   
+   model.set_env(env)
+   # state = env.reset()
+   model.learn(total_timesteps=415000, log_interval=10)
+   new_model_name = "models/" + export_model_name
+   model.save(new_model_name)
+
+
+   # Generate .txt of reward/episode trained
+   env.write_reward()
