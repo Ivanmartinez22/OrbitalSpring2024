@@ -1,5 +1,8 @@
 # Optimal Policy for Maneuvers (OPM)
 
+## Tool setup and usage Instructions 
+Look in Integration_Test.md for instructions on installing and using tool 
+
 ## Overview
 Traditional satellite maneuvering methods often rely on pre-programmed commands or human intervention. The developed tool addresses these limitations by training an agent, in the role of a satellite, to make intelligent decisions in real-time to optimize its trajectory and orbital path for various objectives. This tool also develops a novel approach to the way satellite trajectory changes are performed in that it utilizes Reinforcement Learning (RL) to develop continuous and high precision orbital transfer actions, as opposed to fewer, larger impulse burns (e.g. Hohmann Transfer)
 

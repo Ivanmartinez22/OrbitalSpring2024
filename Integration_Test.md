@@ -37,8 +37,9 @@
 
 ## Analysis Execution (main.py)
 - Define initial state, target state, simulation_date, simulation_duration, spacecraft_mass, and simulation_stepT
-- Run **main.py** and it will prompt you for the options you would like to select
-   ## GUI usage (gui.py)
+- Run **commandline_main.py** and it will prompt you for the options you would like to select
+
+## GUI usage (gui.py)
    - To use the GUI, run **gui.py**
    - While in the GUI, you can edit the values of the attributes to run the program based on your own values
    - To run the program, press **run** and the program will begin to execute in a new window that displays the command line output
@@ -52,7 +53,8 @@
 - A zip of the trained model will appear in the **models** directory
 - Change **line 39** of **visual_orbit.py** to whatever file within the *results/state* folder you want to visualize
 - Run **visual_orbit.py**
-
+- Modify input file name for plotting.py to run plotting.py to create plots for a model 
+- Training creates files under episode_stats which can be used to create plots 
 ## References
 
 A Reinforcement Learning Approach to Spacecraft Trajectory Optimization, [Daniel S. Kolosa](https://github.com/dkolosa/Satmind).
