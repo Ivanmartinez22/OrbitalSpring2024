@@ -24,11 +24,11 @@
 # *****************************************************************************
 
 from testing.env_test import checkPackageVersion, testEnvironment
-from training import train_model, load_model, predict, retrain_model
-import os
-
+from training import train_model
 
 testEnvironment()
+
+
 
 # Page 35 RP(A Reinforcement Learning Approach to Spacecraft Trajectory);
 # [a(m), e, i(deg), omega/w(deg), Omega/raan(deg), TrueAnomaly(v)]
@@ -40,46 +40,9 @@ simulation_duration = 24.0 * 60.0 ** 2 * 4
 spacecraft_mass = [500.0, 150.0]
 # Let Spacecraft take an action every (step) amount of seconds
 simulation_stepT = 500.0
-visualize = True
 
-print("""
 
-Live Visualization Options:
-- Type 'y' to turn on live visualizer for predictions and training.
-- Type 'n' to disable live visualization.
-      
-Options:
-1. Predict with an existing model
-2. Train a new model
-3. Retrain an existing model
-
-To select an option, enter the corresponding number in the command line:
-
-Example Usage:
-Turn on Live visualizer for predictions and training (y/n): y
-Enter 1 for predict, Enter 2 for training, Enter 3 for retraining existing model: 2
-Enter algorithm: PPO, TD3, DDPG: PPO
-""")
-
-user_viz_in = input("Turn on Live visualizer for predictions and training (y/n): ")
-user_train_predict_in = input("Enter 1 for predict, Enter 2 for training, Enter 3 for retraining existing model: ")
 visualize = False
-if user_viz_in == "y":
-    visualize = True
+train_model("PPO", initial_state, target_state, simulation_date, 
+            simulation_duration, spacecraft_mass, simulation_stepT, visualize)
 
-if user_train_predict_in == "1":
-    alg = input("Enter algorithm: PPO, TD3, DDPG: ")
-    model_name_input = input("Enter model name: ")
-    model_name = "models/" + model_name_input
-    model = load_model(alg, model_name)
-    predict(model, initial_state, target_state, simulation_date, 
-                simulation_duration, spacecraft_mass, simulation_stepT, visualize)
-elif user_train_predict_in == "3":
-    alg = input("Enter algorithm: PPO, TD3, DDPG: ")
-    model_name_input = input("Enter input model name: ")
-    export_model_name_input = input("Enter export model name: ")
-    retrain_model(alg, initial_state, target_state, simulation_date, simulation_duration, spacecraft_mass, simulation_stepT, visualize, model_name_input, export_model_name_input)
-elif user_train_predict_in == "2":
-    alg = input("Enter algorithm: PPO, TD3, DDPG: ")
-    train_model(alg, initial_state, target_state, simulation_date, 
-                simulation_duration, spacecraft_mass, simulation_stepT, visualize)
